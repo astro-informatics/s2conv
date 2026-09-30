@@ -130,7 +130,7 @@ marimo edit notebooks/lifted_convolutions.py
 
 ## Equivariance tests 📐
 
-`s2conv.utils.equivariance` measures the rotational equivariance of any operator with the protocol of Cobb et al. (2021) and Ocampo et al. (2023).  It takes the mean, over random band-limited signals and Haar-random rotations, of the relative error ‖T(𝓡f) − 𝓡(Tf)‖ / ‖𝓡(Tf)‖, and reports alongside it the normalisation ‖T(𝓡f)‖ of those papers.  The script `benchmarks/equivariance.py` applies this to every operator of the package at the scale of the papers, 100 signals × 100 rotations.  It tabulates the equivariance errors, reduction errors and timings as markdown, JSON and LaTeX:
+`s2conv.utils.equivariance` measures the rotational equivariance of any operator with the protocol of Cobb et al. (2021) and Ocampo et al. (2023).  It takes the mean, over random band-limited signals and Haar-random rotations, of the relative error ‖T(𝓡f) − 𝓡(Tf)‖ / ‖𝓡(Tf)‖, and reports alongside it the normalisation ‖T(𝓡f)‖ of those papers.  The script `benchmarks/equivariance.py` applies this to every operator of the package at the scale of the papers, 100 signals × 100 rotations.  It tabulates the equivariance errors, reduction errors and timings as markdown, JSON and LaTeX, each stamped with the git commit of the code that produced it:
 
 ```bash
 python benchmarks/equivariance.py -L 16 32 64 -o equivariance.json --latex equivariance.tex

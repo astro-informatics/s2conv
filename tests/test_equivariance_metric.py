@@ -2,9 +2,14 @@
 The equivariance-error protocol of s2conv.utils.equivariance, and the paper-scale benchmark built on it.
 
 The fast tests check the metric itself: its random signals and rotations, exact zero and agreement of the two
-normalisations for equivariant maps, agreement between the harmonic, point and section paths, and the Parseval norms.
-The slow tests run every operator of benchmarks/equivariance.py at 20 signals x 20 rotations.
+normalisations for equivariant maps, agreement between the harmonic, point and section paths, and the Parseval norms,
+and the git commits that the benchmark records.  The slow tests run every operator of benchmarks/equivariance.py at
+20 signals x 20 rotations.
 """
+
+import os
+import shutil
+import subprocess
 
 import jax
 import jax.numpy as jnp
@@ -245,6 +250,50 @@ def _benchmark():
     return equivariance
 
 
+def test_git_revision(tmp_path, monkeypatch, capsys):
+    if shutil.which("git") is None:
+        pytest.skip("requires git")
+    bench = _benchmark()
+    # a repository of its own, independent of the user's git configuration
+    for variable in ("GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"):
+        monkeypatch.setenv(variable, os.devnull)
+    identity = ["-c", "user.name=s2conv", "-c", "user.email=s2conv@example.com"]
+
+    def git(*args):
+        command = ["git", "-C", str(tmp_path), *identity, *args]
+        return subprocess.run(  # noqa: S603
+            command, capture_output=True, text=True, check=True
+        ).stdout.strip()
+
+    module = tmp_path / "module.py"
+    module.write_text("x = 1\n")
+    git("init", "-q")
+    assert bench.git_revision(module) is None  # untracked
+    git("add", "module.py")
+    git("commit", "-q", "-m", "Add a module")
+    revision = bench.git_revision(module)
+    assert revision["commit"] == git("rev-parse", "HEAD")
+    assert os.path.samefile(revision["repository"], tmp_path)
+    assert not revision["dirty"] and revision["modified"] == []
+    (tmp_path / "notes.txt").write_text("untracked files are not changes to the code\n")
+    assert not bench.git_revision(module)["dirty"]
+    module.write_text("x = 2\n")
+    revision = bench.git_revision(module)
+    assert revision["dirty"] and revision["modified"] == ["module.py"]
+    code = {"s2conv": revision, "benchmark": revision, "s2fft": None}
+    assert bench.code_summary(code) == (
+        f"s2conv commit {revision['commit']} with uncommitted changes"
+    )
+    capsys.readouterr()
+    bench.warn_about_code(code)
+    assert "uncommitted changes (module.py)" in capsys.readouterr().err
+    # a script run against s2conv from another checkout
+    code["s2conv"] = dict(revision, repository="elsewhere", dirty=False, modified=[])
+    bench.warn_about_code(code)
+    assert "not from the checkout of this script" in capsys.readouterr().err
+    assert "benchmark script commit" in bench.code_summary(code)
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize("index", range(20))
 def test_benchmark_operators(index):
@@ -298,4 +347,11 @@ def test_benchmark_command_line(tmp_path):
     record = json.loads(json_path.read_text())
     assert {r["name"] for r in record["results"]} >= {"spin_0_0", "group_G", "sifting"}
     assert set(record["timings"]["seconds"]) == {r["name"] for r in record["results"]}
-    assert r"\begin{tabular}" in tex_path.read_text()
+    table = tex_path.read_text()
+    assert r"\begin{tabular}" in table
+    # the commit of the code that ran, in both files, when it runs from a git checkout
+    assert set(record["code"]) == {"s2conv", "benchmark", "s2fft"}
+    assert record["code"]["s2conv"] == bench.git_revision(s2conv.__file__)
+    assert f"% Code: {bench.code_summary(record['code'])}." in table
+    if record["code"]["s2conv"] is not None:
+        assert record["code"]["s2conv"]["commit"] in table

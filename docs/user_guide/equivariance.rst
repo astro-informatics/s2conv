@@ -81,6 +81,13 @@ equivariance error and time.  ``python benchmarks/equivariance.py --help`` lists
 including the numbers of signals and rotations, the operators to run and the band-limit of the
 timings.
 
+Every output records the code that produced it: the git commit of the checkout from which
+s2conv is imported and, when s2fft is installed from a checkout, s2fft's commit.  The JSON
+file has them under ``"code"``, with a flag and the list of files for any uncommitted changes,
+and the markdown output and the LaTeX table state them in a header line.  The script warns
+when the checkouts have uncommitted changes, or when s2conv is imported from a different
+checkout than the script's, so commit before a run whose results are to be kept.
+
 Results
 -------
 

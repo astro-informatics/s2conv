@@ -15,7 +15,9 @@ transforms.  Run it from the repository root, for example::
 
 It prints a markdown table per band-limit, and optionally writes the results with system
 information as JSON and a LaTeX table with the columns operator, reduction error, equivariance
-error and time.
+error and time.  Every output records the git commit of the code that ran, s2conv's and, when
+it is installed from a checkout, s2fft's, and flags uncommitted changes, so commit before a run
+whose results are to be kept.
 """
 
 import argparse
@@ -499,22 +501,112 @@ def time_pipeline(spec: Spec, L: int, key, repeats: int) -> float:
 
 def system_info() -> dict:
     """Versions and devices, as recorded by the s2fft benchmarks."""
+    from importlib import metadata
+
     import jax
     import numpy as np
-    import s2fft
 
     import s2conv
 
+    try:
+        s2fft_version = metadata.version("s2fft")
+    except metadata.PackageNotFoundError:
+        s2fft_version = "unknown"
     return {
         "platform": platform.platform(),
         "python": sys.version.split()[0],
         "numpy": np.__version__,
         "jax": jax.__version__,
-        "s2fft": getattr(s2fft, "__version__", "unknown"),
+        "s2fft": s2fft_version,
         "s2conv": s2conv.__version__,
         "devices": [str(device) for device in jax.devices()],
         "x64": bool(jax.config.read("jax_enable_x64")),
     }
+
+
+def git_revision(file) -> dict | None:
+    """The commit of the git checkout that tracks file and its uncommitted changes, or None if there is none."""
+    import subprocess
+    from pathlib import Path
+
+    path = Path(file).resolve()
+
+    def git(*args):
+        command = ["git", "-C", str(path.parent), "--no-optional-locks", *args]
+        return subprocess.run(  # noqa: S603
+            command, capture_output=True, text=True, check=True
+        ).stdout.strip()
+
+    try:
+        # tracked, not merely inside a checkout, as a package in a virtual environment there is
+        git("ls-files", "--error-unmatch", path.name)
+        modified = git("diff", "--name-only", "HEAD").splitlines()
+        return {
+            "repository": git("rev-parse", "--show-toplevel"),
+            "commit": git("rev-parse", "HEAD"),
+            "dirty": bool(modified),
+            "modified": modified,
+        }
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def code_revisions() -> dict:
+    """The git revisions of the code that runs: the s2conv package, this script and s2fft."""
+    import s2fft
+
+    import s2conv
+
+    return {
+        "s2conv": git_revision(s2conv.__file__),
+        "benchmark": git_revision(__file__),
+        "s2fft": git_revision(s2fft.__file__),
+    }
+
+
+def checkouts(code: dict) -> list:
+    """The distinct git checkouts of code_revisions as (name, revision) pairs."""
+    names = {"s2conv": "s2conv", "benchmark": "benchmark script", "s2fft": "s2fft"}
+    return [
+        (names[key], revision)
+        for key, revision in code.items()
+        if revision is not None
+        and not (key == "benchmark" and revision == code["s2conv"])
+    ]
+
+
+def code_summary(code: dict) -> str:
+    """The commits of the code that runs, in one line."""
+    parts = [
+        f"{name} commit {revision['commit']}"
+        + (" with uncommitted changes" if revision["dirty"] else "")
+        for name, revision in checkouts(code)
+    ]
+    return ", ".join(parts) or "no git checkouts"
+
+
+def warn_about_code(code: dict) -> None:
+    """Warn if the results will not identify the code that runs by its commits alone."""
+    s2conv_revision, script = code["s2conv"], code["benchmark"]
+    if s2conv_revision is None:
+        print(
+            "warning: s2conv is not imported from a git checkout; the results record its version only",
+            file=sys.stderr,
+        )
+    elif script is not None and script["repository"] != s2conv_revision["repository"]:
+        print(
+            f"warning: s2conv is imported from {s2conv_revision['repository']}, "
+            f"not from the checkout of this script, {script['repository']}",
+            file=sys.stderr,
+        )
+    for name, revision in checkouts(code):
+        if revision["dirty"]:
+            print(
+                f"warning: the {name} checkout {revision['repository']} has uncommitted changes "
+                f"({', '.join(revision['modified'])}); the results record commit {revision['commit']} "
+                "and flag the changes",
+                file=sys.stderr,
+            )
 
 
 def scientific(value: float, latex: bool = False) -> str:
@@ -550,12 +642,19 @@ def markdown_table(results: list, timings: dict, time_L: int) -> str:
     return "\n".join(lines)
 
 
-def latex_table(results: list, timings: dict, L: int, time_L: int, args) -> str:
-    """The results at one band-limit as a LaTeX table: operator, reduction and equivariance errors, time."""
-    lines = [
+def latex_table(
+    results: list, timings: dict, L: int, time_L: int, args, provenance: list = ()
+) -> str:
+    """
+    The results at one band-limit as a LaTeX table: operator, reduction and equivariance errors, time.
+
+    The lines of provenance, such as the commits of the code, head the table as comments.
+    """
+    lines = [f"% {line}" for line in provenance] + [
         r"\begin{tabular}{lccc}",
         r"\toprule",
-        rf"Operator & Reduction error & Equivariance error & Time ($L={time_L}$) \\",
+        r"Operator & Reduction error & Equivariance error & "
+        + (rf"Time ($L={time_L}$) \\" if time_L else r"Time \\"),
         r"\midrule",
     ]
     for r in results:
@@ -674,6 +773,15 @@ def main(argv=None):
         cases = [
             c for c in cases if c.name in args.operators or c.group in args.operators
         ]
+    date_time = datetime.datetime.now().isoformat(timespec="seconds")
+    system, code = system_info(), code_revisions()
+    warn_about_code(code)
+    provenance = [
+        f"s2conv equivariance benchmark, {date_time}, JAX {system['jax']}, "
+        f"s2fft {system['s2fft']}, {', '.join(system['devices'])}.",
+        f"Code: {code_summary(code)}.",
+    ]
+    print("\n".join(provenance))
     key = jax.random.key(args.seed)
 
     timings = {}
@@ -727,10 +835,11 @@ def main(argv=None):
 
     if args.output:
         record = {
-            "date_time": datetime.datetime.now().isoformat(timespec="seconds"),
+            "date_time": date_time,
             "command": " ".join(sys.argv),
             "arguments": vars(args),
-            "system": system_info(),
+            "system": system,
+            "code": code,
             "results": results,
             "timings": {"L": args.time_L, "repeats": args.repeats, "seconds": timings},
         }
@@ -746,6 +855,7 @@ def main(argv=None):
                     largest,
                     args.time_L,
                     args,
+                    provenance,
                 )
                 + "\n"
             )
