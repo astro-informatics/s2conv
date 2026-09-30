@@ -36,6 +36,8 @@ with app.setup:
     L_CHECK = 12  # band-limit of the quadrature checks, which are exact at any band-limit
     N_CHECK = 5  # azimuthal band-limit of the Wigner transforms in the checks: orders |n| <= 4
     TOL = 1e-10  # a check passes when its relative error is below TOL
+    N_EQ_FIELDS = 10  # random input fields per equivariance test (100 in Cobb et al., 20 in Ocampo et al.)
+    N_EQ_ROTATIONS = 10  # Haar-random rotations per equivariance test (likewise 100 and 20)
 
 
 @app.cell(hide_code=True)
@@ -61,7 +63,7 @@ def _():
     * against a **literal evaluation**, in which fields are lifted on a sampling of $\mathrm{SO}(3)$, Wigner transformed, convolved and projected back by quadrature along the fibre;
     * against the **real-space definitions** of the classical convolutions (Definitions III.1–III.10), evaluated by exact quadrature with explicit rotations, including the spin phase of Eq. (12).
 
-    Each table reports the maximum relative error of a check.  A ✅ marks agreement to better than $10^{-10}$ or, for an operator that the article says should *not* agree (a non-equivariant operator, for instance), a clear disagreement.  Equation, definition, theorem, figure and table numbers refer to the article.
+    Each table reports the maximum relative error of a check, except the equivariance table of Sec. 12, which reports the mean relative $L^2$ error of Cobb *et al.* (2021) and Ocampo *et al.* (2023).  A ✅ marks agreement to better than $10^{-10}$ or, for an operator that the article says should *not* agree (a non-equivariant operator, for instance), a clear disagreement.  Equation, definition, theorem, figure and table numbers refer to the article.
     """)
     return
 
@@ -1724,34 +1726,69 @@ def _():
     mo.md(r"""
     ## 12. Equivariance (Theorem V.2, Propositions VII.1, VII.2)
 
-    Every lifted convolution commutes with rotations, $\mathcal{C}_{s\to s'}[\Psi]\,\pi_s(g)=\pi_{s'}(g)\,\mathcal{C}_{s\to s'}[\Psi]$ (Theorem V.2).  The test below is carried out in **real space**.  It compares $T(\mathcal{R}f)(\omega)$ with $(\mathcal{R}\,Tf)(\omega)=e^{-\mathrm{i}s'\vartheta}(Tf)(R^{-1}\omega)$ at random points, including the spin phase of Eq. (12).  Outputs on the rotation group are compared through $F(g^{-1}\rho)$.  The section-evaluated and diagonal operators of Sec. VII return a scalar field in the coordinate frame.  Standard correlation and the diagonal operators are guaranteed only polar equivariance, while the commutative anisotropic convolution keeps a polar rotation $R_z(a)$ exactly when $e^{\mathrm{i}ta}=1$ for every active output spin $t$, so that a kernel with even orders only keeps the half turn (Proposition VII.1).
+    Every lifted convolution commutes with rotations, $\mathcal{C}_{s\to s'}[\Psi]\,\pi_s(g)=\pi_{s'}(g)\,\mathcal{C}_{s\to s'}[\Psi]$ (Theorem V.2).  Following Cobb *et al.* (2021) and Ocampo *et al.* (2023), we measure the equivariance of an operator $T$ by the mean relative error
+
+    $$\epsilon(T)=\frac{1}{N_fN_g}\sum_{i=1}^{N_f}\sum_{j=1}^{N_g}\frac{\lVert T(\mathcal{R}_{g_j}f_i)-\mathcal{R}_{g_j}(Tf_i)\rVert}{\lVert\mathcal{R}_{g_j}(Tf_i)\rVert}$$
+
+    over $N_f=10$ random input fields, whose harmonic coefficients are drawn from the standard normal distribution, and $N_g=10$ Haar-random rotations (a single rotation for the polar tests).  The norm is that of $L^2$ on the sphere or on the rotation group.  We normalise by $\lVert\mathcal{R}_gTf\rVert=\lVert Tf\rVert$, which does not depend on the rotation; Cobb *et al.* and Ocampo *et al.* normalise by $\lVert T\mathcal{R}_gf\rVert$, which gives the same error for an equivariant operator.
+
+    For outputs on the sphere the comparison is made in **real space**: $T(\mathcal{R}f)(\omega)$ against $(\mathcal{R}\,Tf)(\omega)=e^{-\mathrm{i}s'\vartheta}(Tf)(R^{-1}\omega)$, including the spin phase of Eq. (12), on a Gauss–Legendre quadrature grid that integrates the squared error of a band-limited output exactly.  Outputs on the rotation group are rotated by left translation of their Wigner coefficients, $(\pi(g)F)^{\ell}_{mn}=\sum_kD^{\ell}_{mk}(g)F^{\ell}_{kn}$, and their norms follow from Parseval's relation for Eq. (7).  The section-evaluated and diagonal operators of Sec. VII return a scalar field in the coordinate frame.  Standard correlation and the diagonal operators are guaranteed only polar equivariance, while the commutative anisotropic convolution keeps a polar rotation $R_z(a)$ exactly when $e^{\mathrm{i}ta}=1$ for every active output spin $t$, so that a kernel with even orders only keeps the half turn (Proposition VII.1).
     """)
     return
 
 
 @app.function
-def equivariance_error(apply, f_lm, s_out, rotation, rng, n_points=60):
-    """Real-space equivariance error of a map with output on the sphere: T(R f)(omega) against
-    e^{-i s' vartheta} (T f)(R^{-1} omega) (Eq. 12) at random points; apply(f) returns a function of (theta, phi)."""
-    theta, phi = np.arccos(rng.uniform(-0.95, 0.95, n_points)), rng.uniform(0, 2 * np.pi, n_points)
-    lhs = apply(rotate_flm(f_lm, wigner_D(*rotation, f_lm.shape[0])))(theta, phi)
-    a, b, c = euler_zyz(rot_matrix(*rotation).T @ section(theta, phi))
-    return rel_err(lhs, np.exp(-1j * s_out * c) * apply(f_lm)(b, a))
+def sphere_quadrature(L):
+    """Gauss-Legendre nodes in cos(theta) and uniform longitudes, flattened, with their weights.  The 2L x 4L nodes
+    integrate the squared modulus of a spin field of band-limit L exactly, and the section evaluations, which are not
+    band-limited, accurately; they avoid the poles."""
+    x, w = np.polynomial.legendre.leggauss(2 * L)
+    n = 4 * L
+    theta, phi = np.meshgrid(np.arccos(x), 2 * np.pi * np.arange(n) / n, indexing="ij")
+    return theta.ravel(), phi.ravel(), np.repeat(w * 2 * np.pi / n, n)
 
 
 @app.function
-def equivariance_error_group(apply, x, rotation, rng, group_input=False, n_points=12):
-    """Equivariance error of a map with output on SO(3): T(pi(g) x)(rho) against (T x)(g^{-1} rho) at random rho."""
-    L = x.shape[1] if group_input else x.shape[0]
-    D = wigner_D(*rotation, L)
-    after, before = apply(rotate_flmn(x, D) if group_input else rotate_flm(x, D)), apply(x)
-    g_inv = rot_matrix(*rotation).T
-    lhs, rhs = [], []
-    for _ in range(n_points):
-        rho = random_rotation(rng)
-        lhs.append(eval_so3(after, *rho))
-        rhs.append(eval_so3(before, *euler_zyz(g_inv @ rot_matrix(*rho))))
-    return rel_err(lhs, rhs)
+def l2_rel_err(a, b, weights):
+    """||a - b|| / ||b|| in the L2 norm defined by the quadrature (or Parseval) weights."""
+    a, b = np.asarray(a), np.asarray(b)
+    return float(np.sqrt(np.sum(weights * np.abs(a - b) ** 2) / max(np.sum(weights * np.abs(b) ** 2), 1e-300)))
+
+
+@app.function
+def equivariance_error(apply, fields, s_out, rotations, group_input=False):
+    """Mean relative equivariance error of a map T with output on the sphere: the mean over the fields f and rotations
+    g of ||T(R_g f) - R_g(T f)|| / ||R_g(T f)||, where R_g(T f)(omega) = e^{-i s' vartheta} (T f)(R_g^{-1} omega) is
+    evaluated in real space (Eq. 12) and the L2 norms by quadrature.  apply(f) returns a function of (theta, phi);
+    group_input marks inputs on SO(3), which are rotated by left translation."""
+    L = fields[0].shape[-2]
+    theta, phi, weights = sphere_quadrature(L)
+    maps = [apply(f) for f in fields]
+    errors = []
+    for rotation in rotations:
+        D = wigner_D(*rotation, L)
+        a, b, c = euler_zyz(rot_matrix(*rotation).T @ section(theta, phi))
+        for f, Tf in zip(fields, maps):
+            lhs = apply(rotate_flmn(f, D) if group_input else rotate_flm(f, D))(theta, phi)
+            errors.append(l2_rel_err(lhs, np.exp(-1j * s_out * c) * Tf(b, a), weights))
+    return float(np.mean(errors))
+
+
+@app.function
+def equivariance_error_group(apply, inputs, rotations, group_input=False):
+    """Mean relative equivariance error of a map T with output on SO(3): the mean over the inputs x and rotations g of
+    ||T(pi(g) x) - pi(g)(T x)|| / ||pi(g)(T x)||, where the left translation pi(g) F(rho) = F(g^{-1} rho) acts on the
+    first Wigner index and ||F||^2 = sum_l (2l+1)/(8 pi^2) sum_{mn} |F^l_{mn}|^2 by Parseval's relation for Eq. (7)."""
+    L = inputs[0].shape[-2]
+    weights = ((2 * np.arange(L) + 1) / EIGHT_PI2)[None, :, None]
+    outputs = [apply(x) for x in inputs]
+    errors = []
+    for rotation in rotations:
+        D = wigner_D(*rotation, L)
+        for x, Tx in zip(inputs, outputs):
+            lhs = apply(rotate_flmn(x, D) if group_input else rotate_flm(x, D))
+            errors.append(l2_rel_err(lhs, rotate_flmn(Tx, D), weights))
+    return float(np.mean(errors))
 
 
 @app.function
@@ -1771,51 +1808,49 @@ def _(seed):
     _rng = np.random.default_rng(seed + 13)
     _L = L_CHECK
     _m = m_axis(_L)
-    _rot = random_rotation(_rng)
-    _polar = (1.1, 0.0, 0.0)
-    _half_turn = (np.pi, 0.0, 0.0)
-    _f0, _f2, _fm1 = generate_flm(_rng, _L), generate_flm(_rng, _L, spin=2), generate_flm(_rng, _L, spin=-1)
+    _rot = [random_rotation(_rng) for _ in range(N_EQ_ROTATIONS)]
+    _polar = [(1.1, 0.0, 0.0)]
+    _half_turn = [(np.pi, 0.0, 0.0)]
+    _f0 = [generate_flm(_rng, _L) for _ in range(N_EQ_FIELDS)]
+    _f2 = [generate_flm(_rng, _L, spin=2) for _ in range(N_EQ_FIELDS)]
+    _fm1 = [generate_flm(_rng, _L, spin=-1) for _ in range(N_EQ_FIELDS)]
     _psi = generate_flm(_rng, _L)
     _psi2 = generate_flm(_rng, _L, spin=2)
-    _F = generate_flmn(_rng, _L, _L)
+    _F = [generate_flmn(_rng, _L, _L) for _ in range(N_EQ_FIELDS)]
     _Psi = random_kernel(_L, _rng)
     _even = conj_field_lm(_psi * (_m % 2 == 0)[None], 0)
 
-    def _row(name, error, expect="agree", rotation="random"):
-        return dict(paper=name, check=f"{rotation} rotation: {'equivariant' if expect == 'agree' else 'not equivariant'}", error=error, expect=expect)
+    def _row(name, error, expect="agree", rotation=f"{N_EQ_ROTATIONS} random rotations"):
+        return dict(paper=name, check=f"{rotation}: {'equivariant' if expect == 'agree' else 'not equivariant'}", error=error, expect=expect)
 
     equivariance_rows = [
-        _row("$\\mathcal{C}_{0\\to0}[\\Psi]$", equivariance_error(on_sphere(_Psi, 0, 0), _f0, 0, _rot, _rng)),
-        _row("$\\mathcal{C}_{2\\to1}[\\Psi]$", equivariance_error(on_sphere(_Psi, 2, 1), _f2, 1, _rot, _rng)),
-        _row("$\\mathcal{C}_{-1\\to2}[\\Psi]$", equivariance_error(on_sphere(_Psi, -1, 2), _fm1, 2, _rot, _rng)),
-        _row("axisymmetric $(2\\pi)^{-1/2}\\mathcal{C}_{0\\to0}[\\Lambda_0\\psi_{\\text{zonal}}]$", equivariance_error(on_sphere(kernel_lifted(_psi * (_m == 0)[None], 0), 0, 0), _f0, 0, _rot, _rng)),
-        _row("left $\\mathcal{C}_{0\\to0}[\\Psi_h]$", equivariance_error(on_sphere(kernel_left(_psi), 0, 0), _f0, 0, _rot, _rng)),
-        _row("spin axisymmetric $\\mathcal{C}_{2\\to0}[\\Lambda_2\\Phi]$", equivariance_error(on_sphere(kernel_lifted(_psi2 * (_m == 0)[None], 2), 2, 0), _f2, 0, _rot, _rng)),
-        _row("$\\eth$: $\\mathcal{C}_{2\\to3}$", equivariance_error(on_sphere(kernel_multiplier(c_eth(_L, 2), 2, 3), 2, 3), _f2, 3, _rot, _rng)),
-        _row("Kaiser–Squires $\\mathcal{C}_{0\\to2}$", equivariance_error(on_sphere(kernel_multiplier(c_kaiser_squires(_L), 0, 2), 0, 2), _f0, 2, _rot, _rng)),
+        _row("$\\mathcal{C}_{0\\to0}[\\Psi]$", equivariance_error(on_sphere(_Psi, 0, 0), _f0, 0, _rot)),
+        _row("$\\mathcal{C}_{2\\to1}[\\Psi]$", equivariance_error(on_sphere(_Psi, 2, 1), _f2, 1, _rot)),
+        _row("$\\mathcal{C}_{-1\\to2}[\\Psi]$", equivariance_error(on_sphere(_Psi, -1, 2), _fm1, 2, _rot)),
+        _row("axisymmetric $(2\\pi)^{-1/2}\\mathcal{C}_{0\\to0}[\\Lambda_0\\psi_{\\text{zonal}}]$", equivariance_error(on_sphere(kernel_lifted(_psi * (_m == 0)[None], 0), 0, 0), _f0, 0, _rot)),
+        _row("left $\\mathcal{C}_{0\\to0}[\\Psi_h]$", equivariance_error(on_sphere(kernel_left(_psi), 0, 0), _f0, 0, _rot)),
+        _row("spin axisymmetric $\\mathcal{C}_{2\\to0}[\\Lambda_2\\Phi]$", equivariance_error(on_sphere(kernel_lifted(_psi2 * (_m == 0)[None], 2), 2, 0), _f2, 0, _rot)),
+        _row("$\\eth$: $\\mathcal{C}_{2\\to3}$", equivariance_error(on_sphere(kernel_multiplier(c_eth(_L, 2), 2, 3), 2, 3), _f2, 3, _rot)),
+        _row("Kaiser–Squires $\\mathcal{C}_{0\\to2}$", equivariance_error(on_sphere(kernel_multiplier(c_kaiser_squires(_L), 0, 2), 0, 2), _f0, 2, _rot)),
         _row("$E$ from $Q\\pm\\mathrm{i}U$", equivariance_error(lambda _p: (lambda _t, _ph: eval_spin(lifted_conv(kernel_multiplier(-0.5 * np.ones(_L), 2, 0), _p, 2, 0)
-                                                                                        + lifted_conv(kernel_multiplier(-0.5 * np.ones(_L), -2, 0), conj_field_lm(_p, 2), -2, 0), 0, _t, _ph)), _f2, 0, _rot, _rng)),
-        _row("directional $\\mathcal{C}_{0\\to G}[\\Lambda_0\\psi]$", equivariance_error_group(lambda _x: lifted_conv(kernel_lifted(_psi, 0), _x, 0, "G"), _f0, _rot, _rng)),
-        _row("directional spin $\\mathcal{C}_{2\\to G}[\\Lambda_2\\psi]$", equivariance_error_group(lambda _x: lifted_conv(kernel_lifted(_psi2, 2), _x, 2, "G"), _f2, _rot, _rng)),
-        _row("group $\\mathcal{C}_{G\\to G}[\\Psi]$", equivariance_error_group(lambda _x: lifted_conv(_Psi, _x, "G", "G"), _F, _rot, _rng, group_input=True)),
+                                                                                        + lifted_conv(kernel_multiplier(-0.5 * np.ones(_L), -2, 0), conj_field_lm(_p, 2), -2, 0), 0, _t, _ph)), _f2, 0, _rot)),
+        _row("directional $\\mathcal{C}_{0\\to G}[\\Lambda_0\\psi]$", equivariance_error_group(lambda _x: lifted_conv(kernel_lifted(_psi, 0), _x, 0, "G"), _f0, _rot)),
+        _row("directional spin $\\mathcal{C}_{2\\to G}[\\Lambda_2\\psi]$", equivariance_error_group(lambda _x: lifted_conv(kernel_lifted(_psi2, 2), _x, 2, "G"), _f2, _rot)),
+        _row("group $\\mathcal{C}_{G\\to G}[\\Psi]$", equivariance_error_group(lambda _x: lifted_conv(_Psi, _x, "G", "G"), _F, _rot, group_input=True)),
     ]
     # Haar synthesis has its input on the group: rotate the input by left translation, compare on the sphere.
     _synthesis = kernel_flip(kernel_lifted(_psi2, 2))
-    _pt, _pp = np.arccos(_rng.uniform(-0.95, 0.95, 60)), _rng.uniform(0, 2 * np.pi, 60)
-    _a, _b, _c = euler_zyz(rot_matrix(*_rot).T @ section(_pt, _pp))
-    _after = eval_spin(lifted_conv(_synthesis, rotate_flmn(_F, wigner_D(*_rot, _L)), "G", 2), 2, _pt, _pp)
-    _before = np.exp(-2j * _c) * eval_spin(lifted_conv(_synthesis, _F, "G", 2), 2, _b, _a)
     equivariance_rows += [
-        _row("Haar synthesis $\\mathcal{C}_{G\\to2}[\\widetilde{\\Lambda_2\\psi}]$", rel_err(_after, _before)),
-        _row("standard correlation $E_{\\sigma_0}[\\Lambda_0\\psi]$", equivariance_error(section_map(kernel_lifted(_psi, 0), 0, _L), _f0, 0, _rot, _rng), "differ"),
-        _row("standard correlation $E_{\\sigma_0}[\\Lambda_0\\psi]$", equivariance_error(section_map(kernel_lifted(_psi, 0), 0, _L), _f0, 0, _polar, _rng), rotation="polar $R_z(1.1)$"),
-        _row("standard correlation, zonal kernel", equivariance_error(section_map(kernel_lifted(_psi * (_m == 0)[None], 0), 0, _L), _f0, 0, _rot, _rng)),
-        _row("commutative anisotropic $\\odot_{\\mathrm{S}}$", equivariance_error(section_map(kernel_lifted(conj_field_lm(_psi, 0), 0), 0, _L, chi_sadeghi), _f0, 0, _rot, _rng), "differ"),
-        _row("commutative anisotropic $\\odot_{\\mathrm{S}}$", equivariance_error(section_map(kernel_lifted(conj_field_lm(_psi, 0), 0), 0, _L, chi_sadeghi), _f0, 0, _polar, _rng), "differ", rotation="polar $R_z(1.1)$"),
-        _row("commutative anisotropic, even orders only", equivariance_error(section_map(kernel_lifted(_even, 0), 0, _L, chi_sadeghi), _f0, 0, _half_turn, _rng), rotation="half turn $R_z(\\pi)$"),
-        _row("sifting $\\circledcirc$", equivariance_error(lambda _x: (lambda _t, _p: eval_spin(_x * np.conj(_psi), 0, _t, _p)), _f0, 0, _rot, _rng), "differ"),
-        _row("sifting $\\circledcirc$", equivariance_error(lambda _x: (lambda _t, _p: eval_spin(_x * np.conj(_psi), 0, _t, _p)), _f0, 0, _polar, _rng), rotation="polar $R_z(1.1)$"),
-        _row("harmonic multiplication, $g_{\\ell m}=g_{\\ell0}$", equivariance_error(lambda _x: (lambda _t, _p: eval_spin(_x * _psi[:, _L - 1 : _L], 0, _t, _p)), _f0, 0, _rot, _rng)),
+        _row("Haar synthesis $\\mathcal{C}_{G\\to2}[\\widetilde{\\Lambda_2\\psi}]$", equivariance_error(lambda _x: (lambda _t, _p: eval_spin(lifted_conv(_synthesis, _x, "G", 2), 2, _t, _p)), _F, 2, _rot, group_input=True)),
+        _row("standard correlation $E_{\\sigma_0}[\\Lambda_0\\psi]$", equivariance_error(section_map(kernel_lifted(_psi, 0), 0, _L), _f0, 0, _rot), "differ"),
+        _row("standard correlation $E_{\\sigma_0}[\\Lambda_0\\psi]$", equivariance_error(section_map(kernel_lifted(_psi, 0), 0, _L), _f0, 0, _polar), rotation="polar rotation $R_z(1.1)$"),
+        _row("standard correlation, zonal kernel", equivariance_error(section_map(kernel_lifted(_psi * (_m == 0)[None], 0), 0, _L), _f0, 0, _rot)),
+        _row("commutative anisotropic $\\odot_{\\mathrm{S}}$", equivariance_error(section_map(kernel_lifted(conj_field_lm(_psi, 0), 0), 0, _L, chi_sadeghi), _f0, 0, _rot), "differ"),
+        _row("commutative anisotropic $\\odot_{\\mathrm{S}}$", equivariance_error(section_map(kernel_lifted(conj_field_lm(_psi, 0), 0), 0, _L, chi_sadeghi), _f0, 0, _polar), "differ", rotation="polar rotation $R_z(1.1)$"),
+        _row("commutative anisotropic, even orders only", equivariance_error(section_map(kernel_lifted(_even, 0), 0, _L, chi_sadeghi), _f0, 0, _half_turn), rotation="half turn $R_z(\\pi)$"),
+        _row("sifting $\\circledcirc$", equivariance_error(lambda _x: (lambda _t, _p: eval_spin(_x * np.conj(_psi), 0, _t, _p)), _f0, 0, _rot), "differ"),
+        _row("sifting $\\circledcirc$", equivariance_error(lambda _x: (lambda _t, _p: eval_spin(_x * np.conj(_psi), 0, _t, _p)), _f0, 0, _polar), rotation="polar rotation $R_z(1.1)$"),
+        _row("harmonic multiplication, $g_{\\ell m}=g_{\\ell0}$", equivariance_error(lambda _x: (lambda _t, _p: eval_spin(_x * _psi[:, _L - 1 : _L], 0, _t, _p)), _f0, 0, _rot)),
     ]
     check_table(equivariance_rows, first="Operator")
     return (equivariance_rows,)
@@ -1854,7 +1889,7 @@ def _(L, N_DIR, eq_op_ui, f_bars, ridge_lm):
     mollweide_grid(_fig.add_subplot(1, 3, 1, projection="mollweide"), _lhs.real, _th, _ph, vmax=_vmax, title="$T(\\mathcal{R}f)$")
     mollweide_grid(_fig.add_subplot(1, 3, 2, projection="mollweide"), _rhs.real, _th, _ph, vmax=_vmax, title="$\\mathcal{R}(Tf)$, with the spin phase")
     mollweide_grid(_fig.add_subplot(1, 3, 3, projection="mollweide"), np.abs(_lhs - _rhs), _th, _ph, cmap="Greys", vmax=_vmax, symmetric=False,
-                   title=f"$|T\\mathcal{{R}}f-\\mathcal{{R}}Tf|$, max relative {rel_err(_lhs, _rhs):.1e}")
+                   title=f"$|T\\mathcal{{R}}f-\\mathcal{{R}}Tf|$, relative $L^2$ error {l2_rel_err(_lhs, _rhs, np.sin(_T)):.1e}")
     _fig
     return
 
