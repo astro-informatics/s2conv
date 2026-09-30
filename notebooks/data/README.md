@@ -13,7 +13,7 @@ and needs `netCDF4`, `scipy`, `healpy` and `camb`, which are not dependencies of
 
 ```bash
 python notebooks/data/make_example_fields.py              # every field
-python notebooks/data/make_example_fields.py cmb planck   # some of them
+python notebooks/data/make_example_fields.py planck gravity  # some of them
 ```
 
 | File | Spin | Field | Source | Licence |
@@ -25,8 +25,6 @@ python notebooks/data/make_example_fields.py cmb planck   # some of them
 | `geoid.npz` | 0 | Geoid height (m) of EGM2008 above the WGS84 ellipsoid, to degree 127, in the spherical approximation N = a Σ (C̄_lm − C̄_lm^WGS84) P̄_lm | ICGEM, EGM2008 (Pavlis et al. 2012, J. Geophys. Res. 117, B04406) | Public release (NGA) |
 | `geomagnetic_potential.npz` | 0 | Geomagnetic main-field potential V/a (nT) at the Earth's surface, IGRF-14 epoch 2025.0, degree 13 | IAGA V-MOD, IGRF-14 coefficients (`igrf14coeffs.txt`) | Free use with acknowledgement |
 | `coastlines.npz` | – | Coastlines at 1:110m, longitude and latitude (degrees) with NaN between lines | Natural Earth | Public domain |
-| `cmb_sim_temperature.npz` | 0 | Simulated CMB temperature (μK): Gaussian realisation of the Planck 2018 best-fit lensed TT spectrum, correlated with E through TE; seed 2027 | Generated from `COM_PowerSpect_CMB-base-plikHM-TTTEEE-lowl-lowE-lensing-minimum-theory_R3.01.txt` (Planck Collaboration 2020, A&A 641, A6) | CC0 |
-| `cmb_sim_polarisation.npz` | 2 | Simulated CMB polarisation Q + iU (μK), from the same realisation: E with the best-fit EE and TE spectra, B with the lensing BB spectrum | As above | CC0 |
 | `cmb_planck_temperature.npz` | 0 | Planck 2018 SMICA CMB temperature (μK), Galactic coordinates, degraded from N_side 2048 to 256 before the harmonic analysis | `COM_CMB_IQU-smica_2048_R3.00_full.fits`, Planck Legacy Archive via IRSA (Planck Collaboration 2020, A&A 641, A4) | Planck (ESA): free use with acknowledgement |
 | `cmb_planck_polarisation.npz` | 2 | Planck 2018 SMICA CMB polarisation Q + iU (μK), as above | As above | As above |
 

@@ -8,7 +8,7 @@ only the slices used are downloaded; the Planck files are downloaded once to CAC
 Run from the root of the repository, with
 
     python notebooks/data/make_example_fields.py              # every field
-    python notebooks/data/make_example_fields.py cmb planck   # some of them
+    python notebooks/data/make_example_fields.py planck gravity  # some of them
 
 This needs netCDF4 (with OPeNDAP support), scipy, healpy and camb, which are not
 dependencies of s2conv.  See README.md in this directory for provenance and licences.
@@ -53,10 +53,6 @@ PLANCK = "https://irsa.ipac.caltech.edu/data/Planck/release_3/"
 PLANCK_SMICA = (
     PLANCK
     + "all-sky-maps/maps/component-maps/cmb/COM_CMB_IQU-smica_2048_R3.00_full.fits"
-)
-PLANCK_THEORY = (
-    PLANCK + "ancillary-data/cosmoparams/"
-    "COM_PowerSpect_CMB-base-plikHM-TTTEEE-lowl-lowE-lensing-minimum-theory_R3.01.txt"
 )
 EGM2008 = (
     "https://icgem.gfz-potsdam.de/getmodel/gfc/"
@@ -301,36 +297,6 @@ def convergence(shift=0.025):
     )
 
 
-def cmb_simulation():
-    """Gaussian CMB temperature and polarisation with the Planck 2018 best-fit
-    lensed power spectra (TT, TE, EE and the lensing BB), in muK."""
-    print("CMB (simulated, Planck 2018 best-fit lensed spectra)")
-    path = cached(PLANCK_THEORY)
-    ell, tt, te, ee, bb = np.loadtxt(path, usecols=(0, 1, 2, 3, 4), unpack=True)
-    to_cl = 2 * np.pi / (ell * (ell + 1))  # the file tabulates D_l = l(l+1) C_l / 2 pi
-    cl = {}
-    for key, d in (("tt", tt), ("te", te), ("ee", ee), ("bb", bb)):
-        cl[key] = np.zeros(L_OUT)
-        cl[key][2:] = (d * to_cl)[: L_OUT - 2]  # the file starts at l = 2
-    rng = np.random.default_rng(SEED + 1)
-    z = standard_alm(L_OUT, rng, 3)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        t_amp = np.sqrt(cl["tt"])
-        e_from_t = np.where(cl["tt"] > 0, cl["te"] / t_amp, 0)
-        e_amp = np.sqrt(np.clip(cl["ee"] - e_from_t**2, 0, None))
-    t = t_amp[:, None] * z[0]
-    e = e_from_t[:, None] * z[0] + e_amp[:, None] * z[1]
-    b = np.sqrt(cl["bb"])[:, None] * z[2]
-    p, _ = physics.eb_to_polarisation(e, b)
-    cite = (
-        "Planck Collaboration (2020), Planck 2018 results VI, A&A 641, A6: best-fit "
-        "lensed power spectra (base-plikHM-TTTEEE-lowl-lowE-lensing); Gaussian "
-        "simulation"
-    )
-    save("cmb_sim_temperature", t, 0, "muK_CMB", "simulated", cite)
-    save("cmb_sim_polarisation", p, 2, "muK_CMB", "simulated", cite)
-
-
 def cmb_planck(nside_low=256):
     """The Planck 2018 SMICA CMB temperature and polarisation maps (Galactic
     coordinates, muK), degraded to nside_low and analysed to band-limit L_OUT."""
@@ -542,7 +508,6 @@ FIELDS = {
     "wind": wind,
     "ocean": ocean_currents,
     "convergence": convergence,
-    "cmb": cmb_simulation,
     "planck": cmb_planck,
     "gravity": gravity,
     "magnetic": magnetic,
@@ -550,7 +515,7 @@ FIELDS = {
 }
 
 if __name__ == "__main__":
-    # build every field, or those named on the command line, e.g. "cmb planck"
+    # build every field, or those named on the command line, e.g. "planck gravity"
     check_spin1_convention()
     for name in sys.argv[1:] or FIELDS:
         FIELDS[name]()
