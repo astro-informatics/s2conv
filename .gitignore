@@ -1,0 +1,50 @@
+# Byte-compiled files and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.cache/
+
+# Packaging and build output
+build/
+dist/
+wheelhouse/
+*.egg-info/
+*.egg
+.eggs/
+
+# Version file written by setuptools_scm at build time
+s2conv/_version.py
+
+# Tests and coverage
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+
+# Linters and type checkers
+.ruff_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+
+# Notebooks (Jupyter and Marimo)
+.ipynb_checkpoints/
+__marimo__/
+
+# Documentation build
+docs/_build/
+docs/api/generated/
+
+# Editors and operating system files
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# Logs
+*.log

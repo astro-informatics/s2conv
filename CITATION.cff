@@ -1,0 +1,41 @@
+cff-version: 1.2.0
+title: >-
+  s2conv: differentiable and accelerated spherical convolutions
+message: >-
+  If you use this software, please cite it using the metadata from this file.
+type: software
+authors:
+  - given-names: Jason D.
+    family-names: McEwen
+    orcid: 'https://orcid.org/0000-0002-5852-8890'
+repository-code: 'https://github.com/astro-informatics/s2conv'
+license: MIT
+references:
+  - type: unpublished
+    authors:
+      - given-names: Jason D.
+        family-names: McEwen
+        orcid: 'https://orcid.org/0000-0002-5852-8890'
+    title: Unifying spherical convolutions through lifting
+    year: 2026
+    status: in-preparation
+    notes: >-
+      Article in preparation, describing the generalised lifted spherical
+      convolution implemented in s2conv.
+  - type: article
+    authors:
+      - given-names: Matthew A.
+        family-names: Price
+      - given-names: Jason
+        family-names: McEwen
+        orcid: 'https://orcid.org/0000-0002-5852-8890'
+    title: Differentiable and accelerated spherical harmonic and Wigner transforms
+    journal: Journal of Computational Physics
+    volume: 510
+    issue: 1
+    start: 113109
+    month: 8
+    year: 2024
+    doi: 10.1016/j.jcp.2024.113109
+    notes: >-
+      s2fft, the software on which the harmonic transforms of s2conv are built.
