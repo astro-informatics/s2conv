@@ -58,7 +58,7 @@ All backends except `"numpy"` are differentiable in reverse mode (`jax.grad`, `j
 
 ## Installation 💻
 
-`S2CONV` requires Python 3.11 or later.  From a clone of this repository,
+`S2CONV` requires Python 3.11 or later, and is tested on Python 3.11 and 3.12.  Python 3.13 awaits the next release of `S2FFT`: version 1.4.0 fails to import on it, because its compiled extension is built for Python 3.12 only.  From a clone of this repository,
 
 ```bash
 pip install .

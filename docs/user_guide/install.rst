@@ -1,9 +1,11 @@
 Installation
 ============
 
-s2conv is a pure-Python package that requires Python 3.11 or later.
-Its dependencies, NumPy, JAX and `s2fft <https://github.com/astro-informatics/s2fft>`_,
-are installed automatically.
+s2conv is a pure-Python package that requires Python 3.11 or later, and is tested on
+Python 3.11 and 3.12.  Its dependencies, NumPy, JAX and
+`s2fft <https://github.com/astro-informatics/s2fft>`_, are installed automatically.
+Python 3.13 awaits the next release of s2fft: version 1.4.0 fails to import on it,
+because its compiled extension is built for Python 3.12 only.
 
 Installing from source
 ----------------------

@@ -23,7 +23,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        # Python 3.13 awaits an s2fft release newer than 1.4.0: the compiled extension
+        # in its abi3 wheels is built for CPython 3.12 only, so s2fft 1.4.0 fails to
+        # import on 3.13 (fixed on s2fft's main branch by #362)
+        python-version: ["3.11", "3.12"]
         os: [ubuntu-latest, macos-latest]
       fail-fast: false
 
@@ -60,7 +63,7 @@ jobs:
         run: python -m pytest --cov=s2conv --cov-report=xml --cov-config=.coveragerc
 
       - name: Upload coverage reports to Codecov
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         uses: codecov/codecov-action@v6
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
