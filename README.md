@@ -4,6 +4,7 @@
 
 [![Tests status](https://github.com/astro-informatics/s2conv/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/astro-informatics/s2conv/actions/workflows/tests.yml)
 [![Linting status](https://github.com/astro-informatics/s2conv/actions/workflows/linting.yml/badge.svg?branch=main)](https://github.com/astro-informatics/s2conv/actions/workflows/linting.yml)
+[![Documentation status](https://github.com/astro-informatics/s2conv/actions/workflows/docs.yml/badge.svg?branch=main)](https://astro-informatics.github.io/s2conv/)
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Linter](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
