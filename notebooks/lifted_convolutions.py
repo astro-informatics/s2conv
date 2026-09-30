@@ -1,6 +1,6 @@
 # Numerical companion to "Unifying spherical convolutions through lifting" (J. D. McEwen).
 # Run in the s2fft conda environment:  marimo edit lifted_convolutions.py  (or: marimo run lifted_convolutions.py)
-# Requires marimo, numpy, matplotlib, jax and s2fft with its SSHT backend (pyssht, ducc0).
+# Requires marimo, numpy, matplotlib, jax and s2fft; transforms use s2fft's JAX backend, on a GPU when JAX finds one.
 
 import marimo
 
@@ -13,7 +13,7 @@ with app.setup:
     import os
     import time
 
-    os.environ.setdefault("JAX_PLATFORMS", "cpu")  # the SSHT backend of s2fft runs on the CPU
+    os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")  # allocate GPU memory as needed
 
     import jax
 
@@ -29,11 +29,12 @@ with app.setup:
     from s2fft.sampling import s2_samples
     from s2fft.utils.signal_generator import generate_flm, generate_flmn
 
-    METHOD = "jax_ssht"  # exact at every spin; s2fft's recursive numpy/jax transforms stop at |spin|, N < 8
+    METHOD = "jax"  # s2fft's JAX transforms: JIT compiled, accurate for spin and azimuthal band-limit N below 8
     SAMPLING = "mw"  # McEwen-Wiaux sampling of the sphere and of the rotation group
     FOUR_PI = 4 * np.pi
     EIGHT_PI2 = 8 * np.pi**2
     L_CHECK = 12  # band-limit of the quadrature checks, which are exact at any band-limit
+    N_CHECK = 5  # azimuthal band-limit of the Wigner transforms in the checks: orders |n| <= 4
     TOL = 1e-10  # a check passes when its relative error is below TOL
 
 
@@ -52,7 +53,7 @@ def _():
     \mathcal{C}_{G\to G}[\Psi] = \Psi\star\cdot\,.
     $$
 
-    In harmonic space each operator reads a single entry, column, row or the whole block of the Wigner coefficients $\Psi^{\ell}_{nm'}$ of the kernel (Theorem V.2 and Fig. 5), so that the convolutions of the literature differ only in their kernels (Tables I and II).  All transforms are computed exactly for band-limited signals with [`s2fft`](https://github.com/astro-informatics/s2fft), which implements the sampling theorems of McEwen & Wiaux on the sphere and of McEwen *et al.* on the rotation group.
+    In harmonic space each operator reads a single entry, column, row or the whole block of the Wigner coefficients $\Psi^{\ell}_{nm'}$ of the kernel (Theorem V.2 and Fig. 5), so that the convolutions of the literature differ only in their kernels (Tables I and II).  All transforms are computed exactly for band-limited signals with [`s2fft`](https://github.com/astro-informatics/s2fft), which implements the sampling theorems of McEwen & Wiaux on the sphere and of McEwen *et al.* on the rotation group.  We use its JAX backend, which compiles the transforms and runs them on a GPU when one is available.  Its recursions are accurate for spins and azimuthal band-limits below 8, so wherever a transform is involved the notebook keeps spins to $|s|\le4$ and azimuthal band-limits to $N\le5$; purely harmonic computations are unrestricted.
 
     Every result is checked numerically in up to three independent ways:
 
@@ -73,7 +74,8 @@ def _():
         [
             mo.md(
                 "**Controls.** The band-limit and seed apply throughout.  The quadrature checks use their own "
-                "band-limit $L = 12$, since they are exact at any band-limit."
+                "band-limit $L = 12$, since they are exact at any band-limit.  The `s2fft` transforms run on "
+                f"the JAX device `{jax.devices()[0]}`."
             ),
             mo.hstack([L_ui, seed_ui], justify="start", gap=2),
         ]
@@ -465,13 +467,14 @@ def lifted_conv(Psi, x, s_in, s_out, N_out=None):
 
 
 @app.function
-def lifted_conv_literal(Psi, samples, s_in, s_out):
+def lifted_conv_literal(Psi, samples, s_in, s_out, N):
     """C_{s_in -> s_out}[Psi] evaluated on samples: the lift on the SO(3) grid, an s2fft Wigner transform, the
-    block product (20), the inverse Wigner transform and the fibre integral.  Group inputs are samples with N = L."""
+    block product (20), the inverse Wigner transform and the fibre integral.  The kernel must be azimuthally
+    band-limited, Psi^l_{nk} = 0 for |n| >= N or |k| >= N, and group inputs and outputs are sampled at N."""
     L = Psi.shape[0]
-    N_in = L if s_in == "G" else abs(s_in) + 1
+    N_in = N if s_in == "G" else abs(s_in) + 1
     F = wigner_fwd(samples if s_in == "G" else lift_grid(samples, s_in, N_in), L, N_in)
-    G = wigner_inv(group_conv(Psi, F, L), L, L)
+    G = wigner_inv(group_conv(Psi, F, N), L, N)
     return G if s_out == "G" else project_grid(G, s_out)
 
 
@@ -490,14 +493,16 @@ def apply_multiplier(c, flm, s, sp):
 
 
 @app.function
-def theorem_v2(Psi, x, s_in, s_out):
-    """The closed forms (43)-(46) of Theorem V.2, written out independently of lifted_conv."""
+def theorem_v2(Psi, x, s_in, s_out, N_out=None):
+    """The closed forms (43)-(46) of Theorem V.2, written out independently of lifted_conv; outputs on the
+    rotation group keep the orders |n| < N_out (default L)."""
     L = Psi.shape[0]
     el = np.arange(L)
+    N_out = L if N_out is None else N_out
     if s_in != "G" and s_out != "G":
         return apply_multiplier(multiplier(Psi, s_in, s_out), x, s_in, s_out)
     if s_in != "G":
-        column = np.conj(Psi[:, :, L - 1 - s_in]).T
+        column = np.conj(Psi[:, L - N_out : L + N_out - 1, L - 1 - s_in]).T
         pref = (-1) ** s_in * np.sqrt(EIGHT_PI2 / (2 * el + 1))
         return column[:, :, None] * (pref[:, None] * x * lm_mask(L, s_in))[None]
     N = n_of(x)
@@ -505,16 +510,20 @@ def theorem_v2(Psi, x, s_in, s_out):
         row = np.conj(Psi[:, L - 1 - s_out, L - N : L + N - 1])
         pref = (-1) ** s_out * np.sqrt((2 * el + 1) / EIGHT_PI2)
         return pref[:, None] * np.einsum("klm,lk->lm", x, row) * lm_mask(L, s_out)
-    return np.einsum("klm,lnk->nlm", x, np.conj(Psi[:, :, L - N : L + N - 1]))
+    return np.einsum("klm,lnk->nlm", x, np.conj(Psi[:, L - N_out : L + N_out - 1, L - N : L + N - 1]))
 
 
 @app.function
-def random_kernel(L, rng):
-    """A random kernel with every Wigner coefficient Psi^l_{nk}, |n|, |k| <= l, populated."""
+def random_kernel(L, rng, N=None):
+    """A random kernel with every Wigner coefficient Psi^l_{nk}, |n|, |k| <= l, populated; with N given, only the
+    orders |n|, |k| < N, i.e. a kernel azimuthally band-limited on both sides."""
     el = np.arange(L)[:, None, None]
     n, k = m_axis(L)[None, :, None], m_axis(L)[None, None, :]
+    support = (np.abs(n) <= el) & (np.abs(k) <= el)
+    if N is not None:
+        support &= (np.abs(n) < N) & (np.abs(k) < N)
     shape = (L, 2 * L - 1, 2 * L - 1)
-    return (rng.standard_normal(shape) + 1j * rng.standard_normal(shape)) * ((np.abs(n) <= el) & (np.abs(k) <= el))
+    return (rng.standard_normal(shape) + 1j * rng.standard_normal(shape)) * support
 
 
 @app.function
@@ -549,7 +558,9 @@ def _():
         [
             mo.md(
                 "Choose the spins; the figure shows the part of a random kernel read by each operator "
-                "(the interactive version of Fig. 5), and the table checks Theorem V.2 at these spins."
+                "(the interactive version of Fig. 5), and the table checks Theorem V.2 at these spins.  The "
+                "literal evaluations use a random kernel with orders $|n|,|k|<5$, so that the Wigner transforms "
+                "on $\\mathrm{SO}(3)$ need only the azimuthal band-limit $N=5$."
             ),
             mo.hstack([s_ui, sp_ui, ell_ui], justify="start", gap=2),
         ]
@@ -561,33 +572,34 @@ def _():
 def _(ell_ui, s_ui, seed, sp_ui):
     _s, _sp, _el = s_ui.value, sp_ui.value, ell_ui.value
     _rng = np.random.default_rng(seed + 1)
-    _L = L_CHECK
-    _Psi = random_kernel(_L, _rng)
+    _L, _N = L_CHECK, N_CHECK
+    _Psi = random_kernel(_L, _rng)  # every entry: for the figure and the harmonic checks
+    _PsiN = random_kernel(_L, _rng, _N)  # orders |n|, |k| < N: for the literal checks through Wigner transforms
     _f = generate_flm(_rng, _L, spin=_s)
     _g = generate_flm(_rng, _L, spin=_sp)
-    _F = generate_flmn(_rng, _L, _L)
-    _f_samples, _F_samples = isht(_f, _L, _s), wigner_inv(_F, _L, _L)
+    _F = generate_flmn(_rng, _L, _N)
+    _f_samples, _F_samples = isht(_f, _L, _s), wigner_inv(_F, _L, _N)
 
     framework_rows = [
         dict(
             paper="Thm V.2, Eq. (44)",
             check=f"$\\mathcal{{C}}_{{{_s}\\to{_sp}}}$: literal (lift on grid, Wigner, block product, fibre integral) vs closed form",
-            error=rel_err(sht(lifted_conv_literal(_Psi, _f_samples, _s, _sp), _L, _sp), theorem_v2(_Psi, _f, _s, _sp)),
+            error=rel_err(sht(lifted_conv_literal(_PsiN, _f_samples, _s, _sp, _N), _L, _sp), theorem_v2(_PsiN, _f, _s, _sp)),
         ),
         dict(
             paper="Thm V.2, Eq. (43)",
             check=f"$\\mathcal{{C}}_{{{_s}\\to G}}$: literal vs closed form",
-            error=rel_err(wigner_fwd(lifted_conv_literal(_Psi, _f_samples, _s, "G"), _L, _L), theorem_v2(_Psi, _f, _s, "G")),
+            error=rel_err(wigner_fwd(lifted_conv_literal(_PsiN, _f_samples, _s, "G", _N), _L, _N), theorem_v2(_PsiN, _f, _s, "G", _N)),
         ),
         dict(
             paper="Thm V.2, Eq. (45)",
             check=f"$\\mathcal{{C}}_{{G\\to{_sp}}}$: literal vs closed form",
-            error=rel_err(sht(lifted_conv_literal(_Psi, _F_samples, "G", _sp), _L, _sp), theorem_v2(_Psi, _F, "G", _sp)),
+            error=rel_err(sht(lifted_conv_literal(_PsiN, _F_samples, "G", _sp, _N), _L, _sp), theorem_v2(_PsiN, _F, "G", _sp)),
         ),
         dict(
             paper="Thm V.2, Eq. (46)",
             check="$\\mathcal{C}_{G\\to G}$: literal vs closed form",
-            error=rel_err(wigner_fwd(lifted_conv_literal(_Psi, _F_samples, "G", "G"), _L, _L), theorem_v2(_Psi, _F, "G", "G")),
+            error=rel_err(wigner_fwd(lifted_conv_literal(_PsiN, _F_samples, "G", "G", _N), _L, _N), theorem_v2(_PsiN, _F, "G", "G", _N)),
         ),
         dict(
             paper="Def. V.1",
@@ -611,10 +623,10 @@ def _(ell_ui, s_ui, seed, sp_ui):
     )
     # Corollary V.4: a kernel whose column -s is supported on n = -s' makes the projection lossless, so that
     # projecting equals sqrt(2 pi) times evaluation on the section gamma = 0; otherwise it does not.
-    _constrained = np.zeros_like(_Psi)
-    _constrained[:, _L - 1 - _sp, _L - 1 - _s] = _Psi[:, _L - 1 - _sp, _L - 1 - _s]
-    for _name, _K, _expect in (("constrained", _constrained, "agree"), ("unconstrained", _Psi, "differ")):
-        _on_section = np.sqrt(2 * np.pi) * lifted_conv_literal(_K, _f_samples, _s, "G")[0]
+    _constrained = np.zeros_like(_PsiN)
+    _constrained[:, _L - 1 - _sp, _L - 1 - _s] = _PsiN[:, _L - 1 - _sp, _L - 1 - _s]
+    for _name, _K, _expect in (("constrained", _constrained, "agree"), ("unconstrained", _PsiN, "differ")):
+        _on_section = np.sqrt(2 * np.pi) * lifted_conv_literal(_K, _f_samples, _s, "G", _N)[0]
         framework_rows.append(
             dict(
                 paper="Cor. V.4",
@@ -651,7 +663,7 @@ def _():
     * **The canonical kernel** of a multiplier $c_\ell$ from spin $s$ to spin $s'$ has the single entry $(\Psi_T)^{\ell}_{-s',-s}=(-1)^{s+s'}c^*_{\ell}$ (Theorem V.5(a)).  It gives every spin-changing convolution and the operators of mathematical physics (Propositions VI.5, VI.8).
     * **The identity entry** $\Psi^{\ell}_{-s,-s}=1$ reproduces the lift and the projection themselves, $\mathcal{C}_{s\to G}=\Lambda_s$ and $\mathcal{C}_{G\to s}=\Lambda_s^\dagger$ (Corollary V.6).  It also gives $\mathcal{C}_{s\to s}=\mathrm{Id}$, whose kernel is a distribution, not a square-integrable function (Theorem V.5(b)).
 
-    The kernels are defined below by their Wigner coefficients.  The check table then samples three of them as functions on $\mathrm{SO}(3)$ and Wigner transforms them with `s2fft`, confirming the stated blocks.
+    The kernels are defined below by their Wigner coefficients.  The check table then samples three of them as functions on $\mathrm{SO}(3)$ and Wigner transforms them with `s2fft`, confirming the stated blocks.  The spherical kernels there have orders $|m|<5$, so that the flipped and left-convolution kernels, whose dependence on $\gamma$ carries those orders, are sampled exactly at the azimuthal band-limit $N=5$.
     """)
     return
 
@@ -743,12 +755,13 @@ def _(L, seed):
 @app.cell
 def _(seed):
     _rng = np.random.default_rng(seed + 3)
-    _L = _N = L_CHECK
+    _L, _N = L_CHECK, N_CHECK
     _th, _ph = sphere_grid(_L)
     _gam = gamma_grid(_N)
+    _orders = (np.abs(m_axis(_L)) < _N)[None]  # orders |m| < N: the kernels below are sampled exactly at N
     kernel_rows = []
     for _s in (0, 2):
-        _psi = generate_flm(_rng, _L, spin=_s)
+        _psi = generate_flm(_rng, _L, spin=_s) * _orders
         _sampled = lift_grid(isht(_psi, _L, _s), _s, _N)
         kernel_rows.append(
             dict(
@@ -767,7 +780,7 @@ def _(seed):
                 error=rel_err(block_from_flmn(wigner_fwd(_flipped, _L, _N)), kernel_flip(kernel_lifted(_psi, _s))),
             )
         )
-    _h = generate_flm(_rng, _L)
+    _h = generate_flm(_rng, _L) * _orders
     _hv = eval_spin(_h, 0, _th[None, :], (np.pi - _gam)[:, None])  # h(beta, pi - gamma) = h(g^{-1} eta)
     _Kh = np.broadcast_to(np.conj(_hv)[:, :, None], (2 * _N - 1, _L, 2 * _L - 1))
     kernel_rows.append(
@@ -1336,31 +1349,32 @@ def _():
 @app.cell
 def _(seed):
     _rng = np.random.default_rng(seed + 9)
-    _L = L_CHECK
-    _Psi1, _Psi2 = random_kernel(_L, _rng), random_kernel(_L, _rng)
+    _L, _N = L_CHECK, N_CHECK
+    _Psi1, _Psi2 = random_kernel(_L, _rng, _N), random_kernel(_L, _rng, _N)  # orders |n|, |k| < N
     _Psi3 = np.einsum("lab,lbc->lac", _Psi2, _Psi1)
-    _F = generate_flmn(_rng, _L, _L)
+    _F = generate_flmn(_rng, _L, _N)
     _f = generate_flm(_rng, _L, spin=1)
-    _out = lifted_conv(_Psi1, _F, "G", "G")
-    _samples = wigner_inv(_out, _L, _L)
-    _gam, (_th, _ph) = gamma_grid(_L), sphere_grid(_L)
+    _out = lifted_conv(_Psi1, _F, "G", "G", N_out=_N)
+    _samples = wigner_inv(_out, _L, _N)
+    _gam, (_th, _ph) = gamma_grid(_N), sphere_grid(_L)
     _errs = []
-    for _j, _t, _p in ((0, 2, 5), (3, 7, 1), (10, 4, 12)):
+    for _j, _t, _p in ((0, 2, 5), (3, 7, 1), (8, 4, 12)):
         _PsiRot = np.einsum("lmk,lkn->lmn", wigner_D(_ph[_p], _th[_t], _gam[_j], _L), _Psi1)  # (pi_G(rho) Psi)^l
+        _PsiRot = _PsiRot[:, :, _L - _N : _L + _N - 1]  # the orders n of the input
         _value = np.sum(((2 * np.arange(_L) + 1) / EIGHT_PI2)[:, None, None] * np.transpose(_F, (1, 2, 0)) * np.conj(_PsiRot))
         _errs.append(abs(_samples[_j, _t, _p] - _value) / abs(_value))
     _psi = generate_flm(_rng, _L, spin=1)
     group_rows = [
         dict(paper="Def. III.4, Eq. (20)", check="$\\mathcal{C}_{G\\to G}[\\Psi]F$ on the grid vs $\\langle F,\\pi_G(\\rho)\\Psi\\rangle$ by Parseval with left translation", error=max(_errs)),
         dict(paper="Prop. V.3, Eq. (47)", check="$\\mathcal{C}_{G\\to G}[\\Psi_2]\\,\\mathcal{C}_{G\\to G}[\\Psi_1]=\\mathcal{C}_{G\\to G}[\\Psi_2\\Psi_1]$",
-             error=rel_err(lifted_conv(_Psi2, _out, "G", "G"), lifted_conv(_Psi3, _F, "G", "G"))),
+             error=rel_err(lifted_conv(_Psi2, _out, "G", "G", N_out=_N), lifted_conv(_Psi3, _F, "G", "G", N_out=_N))),
         dict(paper="Prop. V.3", check="$\\mathcal{C}_{G\\to G}[\\Psi_2]\\,\\mathcal{C}_{1\\to G}[\\Lambda_1\\psi]=\\mathcal{C}_{1\\to G}[\\Psi_2\\,\\Lambda_1\\psi]$ (directional then group)",
              error=rel_err(lifted_conv(_Psi2, lifted_conv(kernel_lifted(_psi, 1), _f, 1, "G"), "G", "G"),
                            lifted_conv(np.einsum("lab,lbc->lac", _Psi2, kernel_lifted(_psi, 1)), _f, 1, "G"))),
         dict(paper="Prop. V.3", check="$\\mathcal{C}_{-2\\to0}[\\Psi_2]\\,\\mathcal{C}_{1\\to-2}[\\Psi_1]$: the multipliers multiply, $c^{(3)}_\\ell=c^{(2)}_\\ell c^{(1)}_\\ell$",
              error=rel_err(lifted_conv(_Psi2, lifted_conv(_Psi1, _f, 1, -2), -2, 0), apply_multiplier(multiplier(_Psi2, -2, 0) * multiplier(_Psi1, 1, -2), _f, 1, 0))),
         dict(paper="Sec. VI D", check="a lifted input reduces $\\mathcal{C}_{G\\to G}$ to $\\mathcal{C}_{s\\to G}$: $\\mathcal{C}_{G\\to G}[\\Psi]\\Lambda_1f=\\mathcal{C}_{1\\to G}[\\Psi]f$",
-             error=rel_err(lifted_conv(_Psi1, lift(_f, 1, _L), "G", "G"), lifted_conv(_Psi1, _f, 1, "G"))),
+             error=rel_err(lifted_conv(_Psi1, lift(_f, 1, _N), "G", "G", N_out=_N), lifted_conv(_Psi1, _f, 1, "G", N_out=_N))),
     ]
     check_table(group_rows)
     return (group_rows,)
@@ -1888,7 +1902,7 @@ def _():
     mo.md(r"""
     ## 14. Cost (Sec. VIII, Table III)
 
-    The operators cost what the part of the kernel they read implies: $\mathcal{O}(L^3)$ for $\mathcal{C}_{s\to s'}$, which needs one forward and one inverse spin transform; $\mathcal{O}(NL^3)$ for $\mathcal{C}_{s\to G}$ with a steerable kernel; and $\mathcal{O}(L^4)$ for an unrestricted group convolution.  The timing below is optional, since it runs transforms up to $L=128$.
+    The operators cost what the part of the kernel they read implies: $\mathcal{O}(L^3)$ for $\mathcal{C}_{s\to s'}$, which needs one forward and one inverse spin transform; $\mathcal{O}(NL^3)$ for $\mathcal{C}_{s\to G}$ with a steerable kernel; and $\mathcal{O}(NL^3+N^2L^2)$ for a group convolution with input and kernel restricted to orders $|n|<N$, which becomes $\mathcal{O}(L^4)$ when $N=L$.  The JAX backend keeps $N<8$, so the timing below fixes $N\le5$: every operator then scales as $L^3$, with a prefactor set by the part of the kernel it reads.  Each transform is compiled on its first call, which the timing excludes.  The timing is optional, since it runs transforms up to $L=128$.
     """)
     return
 
@@ -1905,19 +1919,22 @@ def _(timing_ui):
     mo.stop(not timing_ui.value, mo.md("*Press the button to time the four operators.*"))
     _rng = np.random.default_rng(0)
     _Ls = [16, 32, 64, 128]
-    _times = {"$\\mathcal{C}_{2\\to1}$": [], "$\\mathcal{C}_{2\\to G}$, $N=3$": [], "$\\mathcal{C}_{2\\to G}$, $N=L$": [], "$\\mathcal{C}_{G\\to G}$, $N=L$": []}
+    _N = N_CHECK
+    _names = ["$\\mathcal{C}_{2\\to1}$", "$\\mathcal{C}_{2\\to G}$, $N=3$", f"$\\mathcal{{C}}_{{2\\to G}}$, $N={_N}$", f"$\\mathcal{{C}}_{{G\\to G}}$, $N={_N}$"]
+    _times = {_name: [] for _name in _names}
     for _Lt in _Ls:
         _f = isht(generate_flm(_rng, _Lt, spin=2), _Lt, 2)
         _c = np.ones(_Lt)
         _psi = generate_flm(_rng, _Lt, spin=2)
         _psi3 = _psi * (np.abs(m_axis(_Lt)) < 3)[None]
-        _K = random_kernel(_Lt, _rng)
-        _F = wigner_inv(generate_flmn(_rng, _Lt, _Lt), _Lt, _Lt)
+        _psiN = _psi * (np.abs(m_axis(_Lt)) < _N)[None]
+        _K = random_kernel(_Lt, _rng, _N)
+        _F = wigner_inv(generate_flmn(_rng, _Lt, _N), _Lt, _N)
         _jobs = {
-            "$\\mathcal{C}_{2\\to1}$": lambda: isht(lifted_conv(kernel_multiplier(_c, 2, 1), sht(_f, _Lt, 2), 2, 1), _Lt, 1),
-            "$\\mathcal{C}_{2\\to G}$, $N=3$": lambda: wigner_inv(lifted_conv(kernel_lifted(_psi3, 2), sht(_f, _Lt, 2), 2, "G", N_out=3), _Lt, 3),
-            "$\\mathcal{C}_{2\\to G}$, $N=L$": lambda: wigner_inv(lifted_conv(kernel_lifted(_psi, 2), sht(_f, _Lt, 2), 2, "G"), _Lt, _Lt),
-            "$\\mathcal{C}_{G\\to G}$, $N=L$": lambda: wigner_inv(lifted_conv(_K, wigner_fwd(_F, _Lt, _Lt), "G", "G"), _Lt, _Lt),
+            _names[0]: lambda: isht(lifted_conv(kernel_multiplier(_c, 2, 1), sht(_f, _Lt, 2), 2, 1), _Lt, 1),
+            _names[1]: lambda: wigner_inv(lifted_conv(kernel_lifted(_psi3, 2), sht(_f, _Lt, 2), 2, "G", N_out=3), _Lt, 3),
+            _names[2]: lambda: wigner_inv(lifted_conv(kernel_lifted(_psiN, 2), sht(_f, _Lt, 2), 2, "G", N_out=_N), _Lt, _N),
+            _names[3]: lambda: wigner_inv(lifted_conv(_K, wigner_fwd(_F, _Lt, _N), "G", "G", N_out=_N), _Lt, _N),
         }
         for _name, _job in _jobs.items():
             _job()
@@ -1929,8 +1946,7 @@ def _(timing_ui):
     for _name, _ts in _times.items():
         _ax.loglog(_Ls, _ts, "o-", label=_name)
     _Larr = np.array(_Ls, float)
-    for _p, _style in ((3, ":"), (4, "--")):
-        _ax.loglog(_Larr, _times["$\\mathcal{C}_{G\\to G}$, $N=L$"][-1] * (_Larr / _Larr[-1]) ** _p, _style, color="0.6", label=f"$\\propto L^{_p}$")
+    _ax.loglog(_Larr, _times[_names[3]][-1] * (_Larr / _Larr[-1]) ** 3, ":", color="0.6", label="$\\propto L^3$")
     _ax.set_xticks(_Ls, [str(_Lt) for _Lt in _Ls])
     _ax.minorticks_off()
     _ax.set_xlabel("band-limit $L$")
