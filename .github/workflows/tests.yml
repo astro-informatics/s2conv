@@ -13,6 +13,8 @@ on:
       - .coveragerc
   schedule:
     - cron: 0 0 * * 0
+  # Run on demand from the Actions tab, including the slow tests
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

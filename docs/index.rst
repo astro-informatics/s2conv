@@ -104,6 +104,7 @@ Please see the file ``CITATION.cff`` in the repository for how to cite s2conv.
    :caption: User guide
 
    user_guide/install
+   user_guide/equivariance
 
 .. toctree::
    :hidden:
