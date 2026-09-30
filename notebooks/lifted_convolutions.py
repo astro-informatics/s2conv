@@ -1,6 +1,7 @@
-# Numerical companion to "Unifying spherical convolutions through lifting" (J. D. McEwen).
-# Run in the s2fft conda environment:  marimo edit lifted_convolutions.py  (or: marimo run lifted_convolutions.py)
-# Requires marimo, numpy, matplotlib, jax and s2fft; transforms use s2fft's JAX backend, on a GPU when JAX finds one.
+# Numerical companion to "Unifying spherical convolutions through lifting" (J. D. McEwen), built on the s2conv package.
+# Install s2conv with the notebook extras from the repository root, pip install -e ".[notebooks]", then run
+#     marimo edit notebooks/lifted_convolutions.py   (or: marimo run notebooks/lifted_convolutions.py)
+# Transforms use s2fft's JAX backend through s2conv, on a GPU when JAX finds one.
 
 import marimo
 
@@ -17,20 +18,25 @@ with app.setup:
 
     import jax
 
-    jax.config.update("jax_enable_x64", True)  # must precede the import of s2fft
+    jax.config.update("jax_enable_x64", True)  # must precede the import of s2fft and s2conv
 
+    import jax.numpy as jnp
     import marimo as mo
     import numpy as np
-    import s2fft
+    import s2conv
     from matplotlib.collections import LineCollection
     from matplotlib.figure import Figure
     from matplotlib.patches import Circle, Rectangle
-    from s2fft.recursions import risbo
-    from s2fft.sampling import s2_samples
+    from s2conv import kernels, lifting, transforms
+    from s2conv.convolutions import classical, diagonal, lifted, physics
+    from s2conv.utils.evaluation import evaluate, evaluate_fourier, evaluate_so3
+    from s2conv.utils.indexing import azimuthal_bandlimit, conjugate, lm_mask, m_axis
+    from s2conv.utils.rotation import delta_matrices, euler_angles, rotate_flm, rotate_flmn, rotation_matrix, section, wigner_d
+    from s2fft.recursions import risbo  # an independent recursion for the Wigner functions, used as a reference
     from s2fft.utils.signal_generator import generate_flm, generate_flmn
 
-    METHOD = "jax"  # s2fft's JAX transforms: JIT compiled, accurate for spin and azimuthal band-limit N below 8
-    SAMPLING = "mw"  # McEwen-Wiaux sampling of the sphere and of the rotation group
+    # s2conv's transforms default to McEwen-Wiaux sampling and s2fft's JAX backend, which is JIT compiled and
+    # accurate for spins and azimuthal band-limits N below 8.
     FOUR_PI = 4 * np.pi
     EIGHT_PI2 = 8 * np.pi**2
     L_CHECK = 12  # band-limit of the quadrature checks, which are exact at any band-limit
@@ -39,6 +45,14 @@ with app.setup:
     N_EQ_FIELDS = 10  # random input fields per equivariance test (100 in Cobb et al., 20 in Ocampo et al.)
     N_EQ_ROTATIONS = 10  # Haar-random rotations per equivariance test (likewise 100 and 20)
 
+    # The equivariance tests call these s2conv functions thousands of times on small arrays, so they use them
+    # JIT compiled: each call then runs as one compiled program rather than as a sequence of array operations.
+    evaluate_jit = jax.jit(evaluate, static_argnames=("spin",))
+    rotate_flm_jit = jax.jit(rotate_flm)
+    rotate_flmn_jit = jax.jit(rotate_flmn)
+    lifted_convolution_jit = jax.jit(s2conv.lifted_convolution, static_argnames=("s_in", "s_out", "N_out"))
+    section_components_jit = jax.jit(s2conv.section.section_components, static_argnames=("s_in", "N"))
+
 
 @app.cell(hide_code=True)
 def _():
@@ -46,7 +60,7 @@ def _():
     # Unifying spherical convolutions through lifting
     ## A numerical companion
 
-    This notebook implements the **generalised lifted spherical convolution** of the article *Unifying spherical convolutions through lifting* and recovers the convolutions of Tables I and II of the article, and the conversions of the accompanying notes, through the choice of a harmonic kernel.  A spin-$s$ field on the sphere is lifted to the rotation group, convolved on $\mathrm{SO}(3)$ with a kernel $\Psi$, and projected back to the sphere through the adjoint of the lift for a possibly different spin $s'$ (Definition V.1):
+    This notebook demonstrates the **generalised lifted spherical convolution** of the article *Unifying spherical convolutions through lifting*, as implemented in the [`s2conv`](https://github.com/astro-informatics/s2conv) package, and recovers the convolutions of Tables I and II of the article, and the conversions of the accompanying notes, through the choice of a harmonic kernel.  A spin-$s$ field on the sphere is lifted to the rotation group, convolved on $\mathrm{SO}(3)$ with a kernel $\Psi$, and projected back to the sphere through the adjoint of the lift for a possibly different spin $s'$ (Definition V.1):
 
     $$
     \mathcal{C}_{s\to s'}[\Psi] = \Lambda_{s'}^{\dagger}\,(\Psi\star\Lambda_s\,\cdot\,),\qquad
@@ -55,13 +69,15 @@ def _():
     \mathcal{C}_{G\to G}[\Psi] = \Psi\star\cdot\,.
     $$
 
-    In harmonic space each operator reads a single entry, column, row or the whole block of the Wigner coefficients $\Psi^{\ell}_{nm'}$ of the kernel (Theorem V.2 and Fig. 5), so that the convolutions of the literature differ only in their kernels (Tables I and II).  All transforms are computed exactly for band-limited signals with [`s2fft`](https://github.com/astro-informatics/s2fft), which implements the sampling theorems of McEwen & Wiaux on the sphere and of McEwen *et al.* on the rotation group.  We use its JAX backend, which compiles the transforms and runs them on a GPU when one is available.  Its recursions are accurate for spins and azimuthal band-limits below 8, so wherever a transform is involved the notebook keeps spins to $|s|\le4$ and azimuthal band-limits to $N\le5$; purely harmonic computations are unrestricted.
+    In harmonic space each operator reads a single entry, column, row or the whole block of the Wigner coefficients $\Psi^{\ell}_{nm'}$ of the kernel (Theorem V.2 and Fig. 5), so that the convolutions of the literature differ only in their kernels (Tables I and II).  s2conv computes all transforms exactly for band-limited signals with [`s2fft`](https://github.com/astro-informatics/s2fft), which implements the sampling theorems of McEwen & Wiaux on the sphere and of McEwen *et al.* on the rotation group.  We use its JAX backend, which compiles the transforms and runs them on a GPU when one is available.  Its recursions are accurate for spins and azimuthal band-limits below 8, so wherever a transform is involved the notebook keeps spins to $|s|\le4$ and azimuthal band-limits to $N\le5$; purely harmonic computations are unrestricted.
 
     Every result is checked numerically in up to three independent ways:
 
     * against the **closed-form harmonic expressions** of the article (Theorem V.2, Tables I and II);
     * against a **literal evaluation**, in which fields are lifted on a sampling of $\mathrm{SO}(3)$, Wigner transformed, convolved and projected back by quadrature along the fibre;
     * against the **real-space definitions** of the classical convolutions (Definitions III.1–III.10), evaluated by exact quadrature with explicit rotations, including the spin phase of Eq. (12).
+
+    The operators, kernels, transforms and utilities all come from s2conv; the notebook itself writes out only these independent evaluations, the test fields and the figures.
 
     Each table reports the maximum relative error of a check, except the equivariance table of Sec. 12, which reports the mean relative $L^2$ error of Cobb *et al.* (2021) and Ocampo *et al.* (2023).  A ✅ marks agreement to better than $10^{-10}$ or, for an operator that the article says should *not* agree (a non-equivariant operator, for instance), a clear disagreement.  Equation, definition, theorem, figure and table numbers refer to the article.
     """)
@@ -106,32 +122,12 @@ def _():
     **Arrays.**
     * Harmonic coefficients of any spin are stored as `flm[el, L-1+m]`.
     * Wigner coefficients use the `s2fft` layout `flmn[N-1+n, el, L-1+m]` $=F^{\ell}_{mn}$, with azimuthal band-limit $N$.
-    * A kernel is stored as the block `Psi[el, L-1+n, L-1+k]` $=\Psi^{\ell}_{nk}$.
+    * A kernel is a function on the rotation group, stored by its Wigner coefficients, `kernel[N-1+k, el, L-1+n]` $=\Psi^{\ell}_{nk}$ (Sec. 3); the figures and the closed forms written out in `theorem_v2` use the block `Psi[el, L-1+n, L-1+k]`.
     * Samples are `f[t, p]` at $(\theta_t,\varphi_p)$ on the sphere and `F[j, t, p]` at $(\alpha_p,\beta_t,\gamma_j)$ on the rotation group.
 
-    The real-space checks need fields at arbitrary points.  For these we use the factorisation $d^{\ell}_{mn}(\theta)=\mathrm{i}^{m-n}\sum_k\Delta^{\ell}_{km}\Delta^{\ell}_{kn}\,e^{-\mathrm{i}k\theta}$, with $\Delta^{\ell}=d^{\ell}(\pi/2)$ (Eq. B25), which turns a band-limited spin field into a finite two-dimensional Fourier series in $(\theta,\varphi)$.
+    The real-space checks need fields at arbitrary points.  For these `s2conv.utils.evaluation.evaluate` uses the factorisation $d^{\ell}_{mn}(\theta)=\mathrm{i}^{m-n}\sum_k\Delta^{\ell}_{km}\Delta^{\ell}_{kn}\,e^{-\mathrm{i}k\theta}$, with $\Delta^{\ell}=d^{\ell}(\pi/2)$ (Eq. B25), which turns a band-limited spin field into a finite two-dimensional Fourier series in $(\theta,\varphi)$.
     """)
     return
-
-
-@app.function
-def m_axis(L):
-    """Azimuthal orders -(L-1), ..., L-1 along the last axis of a coefficient array."""
-    return np.arange(-(L - 1), L)
-
-
-@app.function
-def lm_mask(L, s=0):
-    """Entries (el, m) carried by a spin-s field: el >= |s| and |m| <= el."""
-    el = np.arange(L)[:, None]
-    m = m_axis(L)[None, :]
-    return (el >= abs(s)) & (np.abs(m) <= el)
-
-
-@app.function
-def n_of(flmn):
-    """Azimuthal band-limit N of Wigner coefficients stored as flmn[N-1+n, el, L-1+m]."""
-    return (flmn.shape[0] + 1) // 2
 
 
 @app.function
@@ -154,97 +150,6 @@ def check_table(rows, first="Article"):
 
 
 @app.function
-def sht(f, L, s=0):
-    """Forward spin-s spherical harmonic transform of MW samples f[t, p]."""
-    return np.asarray(s2fft.forward(np.asarray(f, np.complex128), L, spin=s, sampling=SAMPLING, method=METHOD))
-
-
-@app.function
-def isht(flm, L, s=0):
-    """Inverse spin-s spherical harmonic transform to MW samples."""
-    return np.asarray(s2fft.inverse(np.asarray(flm, np.complex128), L, spin=s, sampling=SAMPLING, method=METHOD))
-
-
-@app.function
-def wigner_fwd(F, L, N):
-    """Forward Wigner transform (Eq. 7) of samples F[j, t, p] on SO(3)."""
-    return np.asarray(s2fft.wigner.forward(np.asarray(F, np.complex128), L, N, sampling=SAMPLING, method=METHOD))
-
-
-@app.function
-def wigner_inv(flmn, L, N):
-    """Inverse Wigner transform (Eq. 7) to samples F[j, t, p] on SO(3)."""
-    return np.asarray(s2fft.wigner.inverse(np.asarray(flmn, np.complex128), L, N, sampling=SAMPLING, method=METHOD))
-
-
-@app.function
-def sphere_grid(L):
-    """Colatitudes and longitudes of the MW sampling at band-limit L."""
-    return s2_samples.thetas(L, SAMPLING), s2_samples.phis_equiang(L, SAMPLING)
-
-
-@app.function
-def gamma_grid(N):
-    """Samples of the third Euler angle for azimuthal band-limit N."""
-    return 2 * np.pi * np.arange(2 * N - 1) / (2 * N - 1)
-
-
-@app.function
-@functools.cache
-def delta_matrices(L):
-    """Delta^el_{km} = d^el_{km}(pi/2) for el < L by the Risbo recursion, shape [L, 2L-1, 2L-1] (read-only)."""
-    Delta = np.zeros((L, 2 * L - 1, 2 * L - 1))
-    plane = np.zeros((2 * L - 1, 2 * L - 1))
-    for el in range(L):
-        plane = risbo.compute_full(plane, np.pi / 2, L, el)
-        Delta[el] = plane
-    return Delta
-
-
-@app.function
-def wigner_d(beta, L):
-    """d^el_{mn}(beta) = i^{m-n} sum_k Delta_km Delta_kn e^{-ik beta} (Eq. B25), shape [L, 2L-1, 2L-1]."""
-    Delta = delta_matrices(L)
-    k = m_axis(L)
-    d = np.einsum("lkm,k,lkn->lmn", Delta, np.exp(-1j * k * beta), Delta)
-    return (d * (1j) ** (k[:, None] - k[None, :])).real
-
-
-@app.function
-def wigner_D(alpha, beta, gamma, L):
-    """D^el_{mn}(alpha, beta, gamma) = e^{-im alpha} d^el_{mn}(beta) e^{-in gamma} (Eq. 6)."""
-    m = m_axis(L)
-    return np.exp(-1j * m * alpha)[None, :, None] * wigner_d(beta, L) * np.exp(-1j * m * gamma)[None, None, :]
-
-
-@app.function
-def rot_matrix(alpha, beta, gamma):
-    """R(alpha, beta, gamma) = Rz(alpha) Ry(beta) Rz(gamma) (Eq. 1), for scalar or array angles [..., 3, 3]."""
-    alpha, beta, gamma = np.broadcast_arrays(*(np.asarray(x, float) for x in (alpha, beta, gamma)))
-    ca, sa, cb, sb, cg, sg = (np.cos(alpha), np.sin(alpha), np.cos(beta), np.sin(beta), np.cos(gamma), np.sin(gamma))
-    R = np.empty(alpha.shape + (3, 3))
-    R[..., 0, 0], R[..., 0, 1], R[..., 0, 2] = ca * cb * cg - sa * sg, -ca * cb * sg - sa * cg, ca * sb
-    R[..., 1, 0], R[..., 1, 1], R[..., 1, 2] = sa * cb * cg + ca * sg, -sa * cb * sg + ca * cg, sa * sb
-    R[..., 2, 0], R[..., 2, 1], R[..., 2, 2] = -sb * cg, sb * sg, cb
-    return R
-
-
-@app.function
-def section(theta, phi):
-    """The coordinate section s(theta, phi) = R(phi, theta, 0) of Eq. (33)."""
-    return rot_matrix(phi, theta, 0.0)
-
-
-@app.function
-def euler_zyz(R):
-    """Euler angles (a, b, c) with R = Rz(a) Ry(b) Rz(c), for stacked matrices R[..., 3, 3]."""
-    a = np.arctan2(R[..., 1, 2], R[..., 0, 2])
-    b = np.arccos(np.clip(R[..., 2, 2], -1.0, 1.0))
-    c = np.arctan2(R[..., 2, 1], -R[..., 2, 0])
-    return a, b, c
-
-
-@app.function
 def unit_vector(theta, phi):
     """Cartesian unit vectors of the points (theta, phi)."""
     return np.stack([np.sin(theta) * np.cos(phi), np.sin(theta) * np.sin(phi), np.cos(theta)], axis=-1)
@@ -262,101 +167,22 @@ def random_rotation(rng):
     return float(rng.uniform(0, 2 * np.pi)), float(np.arccos(rng.uniform(-1, 1))), float(rng.uniform(0, 2 * np.pi))
 
 
-@app.function
-def rotate_flm(flm, D):
-    """(R_rho f)_{lm} = sum_n D^l_{mn}(rho) f_{ln} (Eq. 10): the same matrices for every spin."""
-    return np.einsum("lmn,ln->lm", D, flm)
-
-
-@app.function
-def rotate_flmn(flmn, D):
-    """Left translation (pi_G(rho) F)^l_{mn} = sum_k D^l_{mk}(rho) F^l_{kn}, acting on the first index."""
-    return np.einsum("lmk,nlk->nlm", D, flmn)
-
-
-@app.function
-def spin_fourier(flm, s):
-    """H_{mk} with sf(theta, phi) = sum_{m,k} H_{mk} e^{i m phi} e^{-i k theta}, from Eqs. (A7) and (B25)."""
-    L = flm.shape[0]
-    Delta = delta_matrices(L)
-    el, m = np.arange(L), m_axis(L)
-    A = flm * lm_mask(L, s) * ((-1) ** s * np.sqrt((2 * el + 1) / FOUR_PI))[:, None]
-    H = np.einsum("lm,lkm,lk->mk", A, Delta, Delta[:, :, L - 1 - s])
-    return H * ((1j) ** (m + s))[:, None]
-
-
-@app.function
-def eval_fourier(H, theta, phi):
-    """Evaluate sum_{m,k} H_{mk} e^{i m phi} e^{-i k theta} at arbitrary points."""
-    m = m_axis((H.shape[0] + 1) // 2)
-    theta, phi = np.broadcast_arrays(np.asarray(theta, float), np.asarray(phi, float))
-    E_phi = np.exp(1j * np.outer(phi.ravel(), m))
-    E_theta = np.exp(-1j * np.outer(theta.ravel(), m))
-    return np.sum((E_phi @ H) * E_theta, axis=1).reshape(theta.shape)
-
-
-@app.function
-def eval_spin(flm, s, theta, phi):
-    """A band-limited spin-s field at arbitrary points (theta, phi)."""
-    return eval_fourier(spin_fourier(flm, s), theta, phi)
-
-
-@app.function
-def conj_field_lm(flm, s):
-    """Harmonic coefficients of the conjugate of a spin-s field, a spin -s field: (-1)^{s+m} f^*_{l,-m} (Eq. A9)."""
-    m = m_axis(flm.shape[0])
-    return ((-1.0) ** (s + m))[None, :] * np.conj(flm[:, ::-1])
-
-
-@app.function
-def lift(flm, s, N):
-    """The lift Lambda_s in harmonic space (Eq. 39): the single Wigner column n = -s."""
-    L = flm.shape[0]
-    out = np.zeros((2 * N - 1, L, 2 * L - 1), np.complex128)
-    out[N - 1 - s] = ((-1) ** s * np.sqrt(EIGHT_PI2 / (2 * np.arange(L) + 1)))[:, None] * flm * lm_mask(L, s)
-    return out
-
-
-@app.function
-def project(flmn, s):
-    """The adjoint projection Lambda_s^dagger in harmonic space (Eq. 39): it reads the Wigner column n = -s."""
-    N, L = n_of(flmn), flmn.shape[1]
-    if abs(s) >= N:
-        return np.zeros((L, 2 * L - 1), np.complex128)
-    return ((-1) ** s * np.sqrt((2 * np.arange(L) + 1) / EIGHT_PI2))[:, None] * flmn[N - 1 - s] * lm_mask(L, s)
-
-
-@app.function
-def lift_grid(f, s, N):
-    """The lift on samples (Eq. 38): (2 pi)^{-1/2} e^{-i s gamma} f(beta, alpha) on the SO(3) grid."""
-    return np.exp(-1j * s * gamma_grid(N))[:, None, None] * f[None] / np.sqrt(2 * np.pi)
-
-
-@app.function
-def project_grid(F, s):
-    """The adjoint projection on samples (Eq. 38): the fibre integral against e^{i s gamma} by the trapezoidal
-    rule, which is exact for fibres band-limited at N > |s|."""
-    N = (F.shape[0] + 1) // 2
-    weights = np.exp(1j * s * gamma_grid(N)) * (2 * np.pi / (2 * N - 1)) / np.sqrt(2 * np.pi)
-    return np.einsum("j,jtp->tp", weights, F)
-
-
 @app.cell
 def _(seed):
     _rng = np.random.default_rng(seed)
     _L = L_CHECK
-    _th, _ph = sphere_grid(_L)
+    _th, _ph = transforms.sphere_angles(_L)
     _T, _P = np.meshgrid(_th, _ph, indexing="ij")
     conventions_rows = []
 
     _errs = []
     for _s in (0, 1, -2, 3):
         _f = generate_flm(_rng, _L, spin=_s)
-        _errs.append(rel_err(eval_spin(_f, _s, _T, _P), isht(_f, _L, _s)))
+        _errs.append(rel_err(evaluate(_f, _s, _T, _P), transforms.inverse(_f, _L, _s)))
     conventions_rows.append(
         dict(
             paper="Eqs. (A7), (B25)",
-            check="spin harmonics from the $\\Delta$ factorisation vs `s2fft.inverse`, $s=0,1,-2,3$",
+            check="spin harmonics from the $\\Delta$ factorisation (`evaluate`) vs `transforms.inverse`, $s=0,1,-2,3$",
             error=max(_errs),
         )
     )
@@ -376,8 +202,8 @@ def _(seed):
         _f = generate_flm(_rng, _L, spin=_s)
         _rot = random_rotation(_rng)
         _pt, _pp = np.arccos(_rng.uniform(-0.95, 0.95, 50)), _rng.uniform(0, 2 * np.pi, 50)
-        _a, _b, _c = euler_zyz(rot_matrix(*_rot).T @ section(_pt, _pp))
-        _errs.append(rel_err(eval_spin(rotate_flm(_f, wigner_D(*_rot, _L)), _s, _pt, _pp), np.exp(-1j * _s * _c) * eval_spin(_f, _s, _b, _a)))
+        _a, _b, _c = euler_angles(rotation_matrix(*_rot).T @ section(_pt, _pp))
+        _errs.append(rel_err(evaluate(rotate_flm(_f, _rot), _s, _pt, _pp), np.exp(-1j * _s * _c) * evaluate(_f, _s, _b, _a)))
     conventions_rows.append(
         dict(
             paper="Eqs. (10), (12), Prop. IV.10",
@@ -389,29 +215,29 @@ def _(seed):
     _errs = []
     for _s in (0, 2, -3):
         _f = generate_flm(_rng, _L, spin=_s)
-        _errs.append(rel_err(wigner_fwd(lift_grid(isht(_f, _L, _s), _s, 4), _L, 4), lift(_f, _s, 4)))
+        _errs.append(rel_err(transforms.wigner_forward(lifting.lift_samples(transforms.inverse(_f, _L, _s), _s, 4), _L, 4), lifting.lift(_f, _s, 4)))
     conventions_rows.append(
         dict(
             paper="Lemma IV.7(c), Eq. (39)",
-            check="lift on the $\\mathrm{SO}(3)$ grid + `s2fft.wigner.forward` vs the column $n=-s$, $s=0,2,-3$",
+            check="lift on the $\\mathrm{SO}(3)$ grid + `transforms.wigner_forward` vs the column $n=-s$, $s=0,2,-3$",
             error=max(_errs),
         )
     )
 
     _G = generate_flmn(_rng, _L, 4)
-    _Fs = wigner_inv(_G, _L, 4)
+    _Fs = transforms.wigner_inverse(_G, _L, 4)
     conventions_rows.append(
         dict(
             paper="Lemma IV.7(c), Eq. (39)",
             check="fibre integral of Wigner samples + spin transform vs reading the column $n=-s$, $s=0,2,-3$",
-            error=max(rel_err(sht(project_grid(_Fs, _s), _L, _s), project(_G, _s)) for _s in (0, 2, -3)),
+            error=max(rel_err(transforms.forward(lifting.project_samples(_Fs, _s), _L, _s), lifting.project(_G, _s)) for _s in (0, 2, -3)),
         )
     )
     conventions_rows.append(
         dict(
             paper="Lemma IV.7(a), Cor. IV.12",
             check="fibre decomposition $F=\\sum_{|s|<N}\\Lambda_s\\Lambda_s^{\\dagger}F$ on samples, $N=4$",
-            error=rel_err(sum(lift_grid(project_grid(_Fs, _s), _s, 4) for _s in range(-3, 4)), _Fs),
+            error=rel_err(sum(lifting.lift_samples(lifting.project_samples(_Fs, _s), _s, 4) for _s in range(-3, 4)), _Fs),
         )
     )
     check_table(conventions_rows)
@@ -442,72 +268,50 @@ def _():
     \end{aligned}
     $$
 
-    The function `lifted_conv` below follows Definition V.1 literally, as a composition of `lift`, `group_conv` and `project` in harmonic space.  The function `lifted_conv_literal` performs the same composition on samples: it lifts on the sampling of $\mathrm{SO}(3)$, applies `s2fft` Wigner transforms and integrates along the fibre.  The function `theorem_v2` writes out the closed forms (43)–(46).
+    s2conv implements the four operators by these closed forms, in `s2conv.lifted_convolution`.  The table below checks the closed forms against `lifted_conv_literal`, which follows Definition V.1 on samples: it lifts on the sampling of $\mathrm{SO}(3)$, applies Wigner transforms, convolves and integrates along the fibre.  It then checks `s2conv.lifted_convolution`, and `definition_v1`, which composes s2conv's lift, group convolution and projection in harmonic space, against the closed forms as written out independently in `theorem_v2`.
     """)
     return
 
 
 @app.function
-def group_conv(Psi, flmn, N_out):
-    """The group convolution in Wigner space (Eq. 20): (Psi * F)^l_{mn} = sum_k F^l_{mk} Psi^{l*}_{nk}."""
-    N_in, L = n_of(flmn), flmn.shape[1]
-    block = Psi[:, L - N_out : L + N_out - 1, L - N_in : L + N_in - 1]
-    return np.einsum("klm,lnk->nlm", flmn, np.conj(block))
-
-
-@app.function
-def lifted_conv(Psi, x, s_in, s_out, N_out=None):
-    """The generalised lifted convolution C_{s_in -> s_out}[Psi] of Definition V.1, in harmonic space.
-
-    x holds spin-s_in coefficients flm or, for s_in = "G", Wigner coefficients flmn; s_out = "G" returns
-    Wigner coefficients with azimuthal band-limit N_out (default L)."""
-    L = Psi.shape[0]
-    F = x if s_in == "G" else lift(x, s_in, abs(s_in) + 1)
-    if s_out == "G":
-        return group_conv(Psi, F, L if N_out is None else N_out)
-    return project(group_conv(Psi, F, abs(s_out) + 1), s_out)
-
-
-@app.function
-def lifted_conv_literal(Psi, samples, s_in, s_out, N):
-    """C_{s_in -> s_out}[Psi] evaluated on samples: the lift on the SO(3) grid, an s2fft Wigner transform, the
-    block product (20), the inverse Wigner transform and the fibre integral.  The kernel must be azimuthally
-    band-limited, Psi^l_{nk} = 0 for |n| >= N or |k| >= N, and group inputs and outputs are sampled at N."""
-    L = Psi.shape[0]
+def lifted_conv_literal(samples, kernel, s_in, s_out, N):
+    """C_{s_in -> s_out}[Psi] evaluated on samples with the pieces of s2conv: the lift on the SO(3) grid, the Wigner
+    transform, the group convolution (20), the inverse Wigner transform and the fibre integral.  The kernel must be
+    azimuthally band-limited, Psi^l_{nk} = 0 for |n| >= N or |k| >= N, and group inputs and outputs are sampled at N."""
+    L = kernel.shape[1]
     N_in = N if s_in == "G" else abs(s_in) + 1
-    F = wigner_fwd(samples if s_in == "G" else lift_grid(samples, s_in, N_in), L, N_in)
-    G = wigner_inv(group_conv(Psi, F, N), L, N)
-    return G if s_out == "G" else project_grid(G, s_out)
+    F = transforms.wigner_forward(samples if s_in == "G" else lifting.lift_samples(samples, s_in, N_in), L, N_in)
+    G = transforms.wigner_inverse(lifted.group_convolution(F, kernel, N), L, N)
+    return G if s_out == "G" else lifting.project_samples(G, s_out)
 
 
 @app.function
-def multiplier(Psi, s, sp):
-    """The multiplier c_l = (-1)^{s+s'} Psi^{l*}_{-s',-s} of Eq. (44), zero below l = max(|s|, |s'|)."""
-    L = Psi.shape[0]
-    c = (-1) ** (s + sp) * np.conj(Psi[:, L - 1 - sp, L - 1 - s])
-    return np.where(np.arange(L) >= max(abs(s), abs(sp)), c, 0.0)
+def definition_v1(x, kernel, s_in, s_out, N_out=None):
+    """C_{s_in -> s_out}[Psi] composed as in Definition V.1 from s2conv's lift, group convolution and adjoint
+    projection, in harmonic space; outputs on the rotation group keep the orders |n| < N_out (default L)."""
+    L = kernel.shape[1]
+    F = x if s_in == "G" else lifting.lift(x, s_in)
+    if s_out == "G":
+        return lifted.group_convolution(F, kernel, L if N_out is None else N_out)
+    return lifting.project(lifted.group_convolution(F, kernel, abs(s_out) + 1), s_out)
 
 
 @app.function
-def apply_multiplier(c, flm, s, sp):
-    """(T f)_{lm} = c_l f_{lm} for l >= max(|s|, |s'|), the form of every equivariant map (Eq. 51)."""
-    return np.asarray(c)[:, None] * flm * lm_mask(flm.shape[0], max(abs(s), abs(sp)))
-
-
-@app.function
-def theorem_v2(Psi, x, s_in, s_out, N_out=None):
-    """The closed forms (43)-(46) of Theorem V.2, written out independently of lifted_conv; outputs on the
-    rotation group keep the orders |n| < N_out (default L)."""
+def theorem_v2(x, kernel, s_in, s_out, N_out=None):
+    """The closed forms (43)-(46) of Theorem V.2, written out from the kernel block Psi^l_{nk} independently of
+    s2conv's operators; outputs on the rotation group keep the orders |n| < N_out (default L)."""
+    Psi = block_from_flmn(kernel)
     L = Psi.shape[0]
     el = np.arange(L)
     N_out = L if N_out is None else N_out
     if s_in != "G" and s_out != "G":
-        return apply_multiplier(multiplier(Psi, s_in, s_out), x, s_in, s_out)
+        c = (-1) ** (s_in + s_out) * np.conj(Psi[:, L - 1 - s_out, L - 1 - s_in])
+        return c[:, None] * x * lm_mask(L, max(abs(s_in), abs(s_out)))
     if s_in != "G":
         column = np.conj(Psi[:, L - N_out : L + N_out - 1, L - 1 - s_in]).T
         pref = (-1) ** s_in * np.sqrt(EIGHT_PI2 / (2 * el + 1))
         return column[:, :, None] * (pref[:, None] * x * lm_mask(L, s_in))[None]
-    N = n_of(x)
+    N = azimuthal_bandlimit(x)
     if s_out != "G":
         row = np.conj(Psi[:, L - 1 - s_out, L - N : L + N - 1])
         pref = (-1) ** s_out * np.sqrt((2 * el + 1) / EIGHT_PI2)
@@ -517,20 +321,21 @@ def theorem_v2(Psi, x, s_in, s_out, N_out=None):
 
 @app.function
 def random_kernel(L, rng, N=None):
-    """A random kernel with every Wigner coefficient Psi^l_{nk}, |n|, |k| <= l, populated; with N given, only the
-    orders |n|, |k| < N, i.e. a kernel azimuthally band-limited on both sides."""
-    el = np.arange(L)[:, None, None]
-    n, k = m_axis(L)[None, :, None], m_axis(L)[None, None, :]
-    support = (np.abs(n) <= el) & (np.abs(k) <= el)
-    if N is not None:
-        support &= (np.abs(n) < N) & (np.abs(k) < N)
-    shape = (L, 2 * L - 1, 2 * L - 1)
+    """A random kernel in s2conv's layout, kernel[N-1+k, el, L-1+n] = Psi^l_{nk}, with every Wigner coefficient,
+    |n|, |k| <= l, populated; with N given, only the orders |n|, |k| < N, i.e. azimuthally band-limited on both sides."""
+    N_k = L if N is None else N
+    k = np.arange(-(N_k - 1), N_k)[:, None, None]
+    el = np.arange(L)[None, :, None]
+    n = m_axis(L)[None, None, :]
+    support = (np.abs(n) <= el) & (np.abs(k) <= el) & (np.abs(n) < N_k)
+    shape = (2 * N_k - 1, L, 2 * L - 1)
     return (rng.standard_normal(shape) + 1j * rng.standard_normal(shape)) * support
 
 
 @app.function
-def kernel_block_plot(ax, Psi, el, read=(), title=None):
-    """|Psi^l_{nk}| at one degree, with the entries read by an operator outlined."""
+def kernel_block_plot(ax, kernel, el, read=(), title=None):
+    """|Psi^l_{nk}| of a kernel at one degree, with the entries read by an operator outlined."""
+    Psi = block_from_flmn(kernel)
     L = Psi.shape[0]
     block = np.abs(Psi[el, L - 1 - el : L + el, L - 1 - el : L + el])
     ax.imshow(block, cmap="magma", extent=(-el - 0.5, el + 0.5, el + 0.5, -el - 0.5), vmin=0)
@@ -580,60 +385,59 @@ def _(ell_ui, s_ui, seed, sp_ui):
     _f = generate_flm(_rng, _L, spin=_s)
     _g = generate_flm(_rng, _L, spin=_sp)
     _F = generate_flmn(_rng, _L, _N)
-    _f_samples, _F_samples = isht(_f, _L, _s), wigner_inv(_F, _L, _N)
+    _f_samples, _F_samples = transforms.inverse(_f, _L, _s), transforms.wigner_inverse(_F, _L, _N)
 
     framework_rows = [
         dict(
             paper="Thm V.2, Eq. (44)",
-            check=f"$\\mathcal{{C}}_{{{_s}\\to{_sp}}}$: literal (lift on grid, Wigner, block product, fibre integral) vs closed form",
-            error=rel_err(sht(lifted_conv_literal(_PsiN, _f_samples, _s, _sp, _N), _L, _sp), theorem_v2(_PsiN, _f, _s, _sp)),
+            check=f"$\\mathcal{{C}}_{{{_s}\\to{_sp}}}$: literal (lift on grid, Wigner, group convolution, fibre integral) vs closed form",
+            error=rel_err(transforms.forward(lifted_conv_literal(_f_samples, _PsiN, _s, _sp, _N), _L, _sp), theorem_v2(_f, _PsiN, _s, _sp)),
         ),
         dict(
             paper="Thm V.2, Eq. (43)",
             check=f"$\\mathcal{{C}}_{{{_s}\\to G}}$: literal vs closed form",
-            error=rel_err(wigner_fwd(lifted_conv_literal(_PsiN, _f_samples, _s, "G", _N), _L, _N), theorem_v2(_PsiN, _f, _s, "G", _N)),
+            error=rel_err(transforms.wigner_forward(lifted_conv_literal(_f_samples, _PsiN, _s, "G", _N), _L, _N), theorem_v2(_f, _PsiN, _s, "G", _N)),
         ),
         dict(
             paper="Thm V.2, Eq. (45)",
             check=f"$\\mathcal{{C}}_{{G\\to{_sp}}}$: literal vs closed form",
-            error=rel_err(sht(lifted_conv_literal(_PsiN, _F_samples, "G", _sp, _N), _L, _sp), theorem_v2(_PsiN, _F, "G", _sp)),
+            error=rel_err(transforms.forward(lifted_conv_literal(_F_samples, _PsiN, "G", _sp, _N), _L, _sp), theorem_v2(_F, _PsiN, "G", _sp)),
         ),
         dict(
             paper="Thm V.2, Eq. (46)",
             check="$\\mathcal{C}_{G\\to G}$: literal vs closed form",
-            error=rel_err(wigner_fwd(lifted_conv_literal(_PsiN, _F_samples, "G", "G", _N), _L, _N), theorem_v2(_PsiN, _F, "G", "G", _N)),
+            error=rel_err(transforms.wigner_forward(lifted_conv_literal(_F_samples, _PsiN, "G", "G", _N), _L, _N), theorem_v2(_F, _PsiN, "G", "G", _N)),
         ),
         dict(
             paper="Def. V.1",
-            check="harmonic composition `project(group_conv(lift))` vs closed forms (43)–(46)",
+            check="`s2conv.lifted_convolution` and the composition `definition_v1` vs closed forms (43)–(46)",
             error=max(
-                rel_err(lifted_conv(_Psi, _f, _s, _sp), theorem_v2(_Psi, _f, _s, _sp)),
-                rel_err(lifted_conv(_Psi, _f, _s, "G"), theorem_v2(_Psi, _f, _s, "G")),
-                rel_err(lifted_conv(_Psi, _F, "G", _sp), theorem_v2(_Psi, _F, "G", _sp)),
-                rel_err(lifted_conv(_Psi, _F, "G", "G"), theorem_v2(_Psi, _F, "G", "G")),
+                rel_err(_operator(_x, _Psi, _si, _so), theorem_v2(_x, _Psi, _si, _so))
+                for _operator in (s2conv.lifted_convolution, definition_v1)
+                for _x, _si, _so in ((_f, _s, _sp), (_f, _s, "G"), (_F, "G", _sp), (_F, "G", "G"))
             ),
         ),
     ]
-    _flip = kernel_flip(_Psi)
+    _flip = kernels.flipped(_Psi)
     framework_rows.append(
         dict(
             paper="Thm V.2 (adjoints)",
             check=f"$\\langle\\mathcal{{C}}_{{{_s}\\to{_sp}}}[\\Psi]f,g\\rangle=\\langle f,\\mathcal{{C}}_{{{_sp}\\to{_s}}}[\\widetilde\\Psi]g\\rangle$",
-            error=abs(np.sum(lifted_conv(_Psi, _f, _s, _sp) * np.conj(_g)) - np.sum(_f * np.conj(lifted_conv(_flip, _g, _sp, _s))))
-            / abs(np.sum(lifted_conv(_Psi, _f, _s, _sp) * np.conj(_g))),
+            error=abs(np.sum(s2conv.lifted_convolution(_f, _Psi, _s, _sp) * np.conj(_g)) - np.sum(_f * np.conj(s2conv.lifted_convolution(_g, _flip, _sp, _s))))
+            / abs(np.sum(s2conv.lifted_convolution(_f, _Psi, _s, _sp) * np.conj(_g))),
         )
     )
     # Corollary V.4: a kernel whose column -s is supported on n = -s' makes the projection lossless, so that
     # projecting equals sqrt(2 pi) times evaluation on the section gamma = 0; otherwise it does not.
-    _constrained = np.zeros_like(_PsiN)
-    _constrained[:, _L - 1 - _sp, _L - 1 - _s] = _PsiN[:, _L - 1 - _sp, _L - 1 - _s]
+    _constrained = np.zeros_like(_PsiN)  # the kernel layout is [N-1+k, el, L-1+n]: keep only the entry (-s', -s)
+    _constrained[_N - 1 - _s, :, _L - 1 - _sp] = _PsiN[_N - 1 - _s, :, _L - 1 - _sp]
     for _name, _K, _expect in (("constrained", _constrained, "agree"), ("unconstrained", _PsiN, "differ")):
-        _on_section = np.sqrt(2 * np.pi) * lifted_conv_literal(_K, _f_samples, _s, "G", _N)[0]
+        _on_section = np.sqrt(2 * np.pi) * lifted_conv_literal(_f_samples, _K, _s, "G", _N)[0]
         framework_rows.append(
             dict(
                 paper="Cor. V.4",
                 check=f"{_name} kernel: $\\sqrt{{2\\pi}}(\\Psi\\star\\Lambda_s f)\\circ s$ vs $\\mathcal{{C}}_{{{_s}\\to{_sp}}}f$ (should {_expect})",
-                error=rel_err(_on_section, isht(lifted_conv(_K, _f, _s, _sp), _L, _sp)),
+                error=rel_err(_on_section, transforms.inverse(s2conv.lifted_convolution(_f, _K, _s, _sp), _L, _sp)),
                 expect=_expect,
             )
         )
@@ -665,60 +469,16 @@ def _():
     * **The canonical kernel** of a multiplier $c_\ell$ from spin $s$ to spin $s'$ has the single entry $(\Psi_T)^{\ell}_{-s',-s}=(-1)^{s+s'}c^*_{\ell}$ (Theorem V.5(a)).  It gives every spin-changing convolution and the operators of mathematical physics (Propositions VI.5, VI.8).
     * **The identity entry** $\Psi^{\ell}_{-s,-s}=1$ reproduces the lift and the projection themselves, $\mathcal{C}_{s\to G}=\Lambda_s$ and $\mathcal{C}_{G\to s}=\Lambda_s^\dagger$ (Corollary V.6).  It also gives $\mathcal{C}_{s\to s}=\mathrm{Id}$, whose kernel is a distribution, not a square-integrable function (Theorem V.5(b)).
 
-    The kernels are defined below by their Wigner coefficients.  The check table then samples three of them as functions on $\mathrm{SO}(3)$ and Wigner transforms them with `s2fft`, confirming the stated blocks.  The spherical kernels there have orders $|m|<5$, so that the flipped and left-convolution kernels, whose dependence on $\gamma$ carries those orders, are sampled exactly at the azimuthal band-limit $N=5$.
+    The module `s2conv.kernels` constructs each of them.  It stores a kernel as a function on $\mathrm{SO}(3)$, by its Wigner coefficients in the layout of `s2fft`, `kernel[N-1+k, el, L-1+n]` $=\Psi^{\ell}_{nk}$, where the azimuthal band-limit $N$ bounds the second index $k$; the figures show the block $\Psi^{\ell}$ at one degree.  The check table then samples three of the kernels as functions on $\mathrm{SO}(3)$ and Wigner transforms them with `s2fft`, confirming the stated blocks.  The spherical kernels there have orders $|m|<5$, so that the flipped and left-convolution kernels, whose dependence on $\gamma$ carries those orders, are sampled exactly at the azimuthal band-limit $N=5$.
     """)
     return
 
 
 @app.function
-def kernel_lifted(psi_lm, s):
-    """Lambda_s psi as a kernel (Lemma IV.7(c)): the column k = -s, Psi^l_{n,-s} = (-1)^s sqrt(8pi^2/(2l+1)) psi_{ln}."""
-    L = psi_lm.shape[0]
-    Psi = np.zeros((L, 2 * L - 1, 2 * L - 1), np.complex128)
-    Psi[:, :, L - 1 - s] = ((-1) ** s * np.sqrt(EIGHT_PI2 / (2 * np.arange(L) + 1)))[:, None] * psi_lm * lm_mask(L, s)
-    return Psi
-
-
-@app.function
-def kernel_flip(Psi):
-    """The flipped kernel Psi~(g) = Psi^*(g^{-1}) of Theorem V.2, whose blocks are Psi^{l dagger}."""
-    return np.conj(np.transpose(Psi, (0, 2, 1)))
-
-
-@app.function
-def kernel_left(h_lm):
-    """Psi_h(g) = h^*(g^{-1} eta) of Proposition VI.4: the single row n = 0, (Psi_h)^l_{0k} = 2pi sqrt(4pi/(2l+1)) h^*_{lk}."""
-    L = h_lm.shape[0]
-    Psi = np.zeros((L, 2 * L - 1, 2 * L - 1), np.complex128)
-    Psi[:, L - 1, :] = (2 * np.pi * np.sqrt(FOUR_PI / (2 * np.arange(L) + 1)))[:, None] * np.conj(h_lm) * lm_mask(L)
-    return Psi
-
-
-@app.function
-def kernel_multiplier(c, s, sp):
-    """The canonical kernel of a multiplier c_l from spin s to spin s' (Theorem V.5(a)):
-    the single entry (Psi_T)^l_{-s',-s} = (-1)^{s+s'} c_l^*, l >= max(|s|, |s'|)."""
-    c = np.asarray(c, np.complex128)
-    L = len(c)
-    Psi = np.zeros((L, 2 * L - 1, 2 * L - 1), np.complex128)
-    keep = np.arange(L) >= max(abs(s), abs(sp))
-    Psi[:, L - 1 - sp, L - 1 - s] = np.where(keep, (-1) ** (s + sp) * np.conj(c), 0.0)
-    return Psi
-
-
-@app.function
-def kernel_identity(L, s):
-    """The single entry Psi^l_{-s,-s} = 1, l >= |s|: C_{s->G} = Lambda_s, C_{G->s} = Lambda_s^dagger and C_{s->s} = Id
-    (Corollary V.6).  It is a distribution, not a square-integrable kernel (Theorem V.5(b))."""
-    Psi = np.zeros((L, 2 * L - 1, 2 * L - 1), np.complex128)
-    Psi[abs(s) :, L - 1 - s, L - 1 - s] = 1.0
-    return Psi
-
-
-@app.function
 def block_from_flmn(flmn):
-    """The kernel block Psi[l, n, k] from the s2fft Wigner coefficients flmn[N-1+k, l, L-1+n] of a function Psi(g)."""
-    N, L = n_of(flmn), flmn.shape[1]
+    """The block Psi[l, L-1+n, L-1+k] of a kernel stored by s2conv as the Wigner coefficients flmn[N-1+k, l, L-1+n]
+    of the function Psi(g), for the figures and for the closed forms written out in theorem_v2."""
+    N, L = azimuthal_bandlimit(flmn), flmn.shape[1]
     Psi = np.zeros((L, 2 * L - 1, 2 * L - 1), np.complex128)
     Psi[:, :, L - N : L + N - 1] = np.transpose(flmn, (1, 2, 0))
     return Psi
@@ -731,20 +491,20 @@ def _(L, seed):
     _m = m_axis(L)
     _psi2 = generate_flm(_rng, L, spin=2)
     _gallery = [
-        ("axisymmetric\n$\\Lambda_0\\psi$, $\\psi_{\\ell m}\\propto\\delta_{m0}$", kernel_lifted(generate_flm(_rng, L) * (_m == 0)[None], 0), [("entry", (0, 0))]),
-        ("left (Driscoll–Healy)\n$\\Psi_h$", kernel_left(generate_flm(_rng, L)), [("entry", (0, 0))]),
-        ("directional\n$\\Lambda_0\\psi$", kernel_lifted(generate_flm(_rng, L), 0), [("column", 0)]),
-        ("directional spin-2\n$\\Lambda_2\\psi$", kernel_lifted(_psi2, 2), [("column", -2)]),
-        ("Haar synthesis, spin 2\n$\\widetilde{\\Lambda_2\\psi}$", kernel_flip(kernel_lifted(_psi2, 2)), [("row", -2)]),
-        ("spin $2\\to1$ multiplier\n$\\Psi_T$", kernel_multiplier(np.ones(L), 2, 1), [("entry", (-1, -2))]),
+        ("axisymmetric\n$\\Lambda_0\\psi$, $\\psi_{\\ell m}\\propto\\delta_{m0}$", kernels.lifted(generate_flm(_rng, L) * (_m == 0)[None], 0), [("entry", (0, 0))]),
+        ("left (Driscoll–Healy)\n$\\Psi_h$", kernels.left(generate_flm(_rng, L)), [("entry", (0, 0))]),
+        ("directional\n$\\Lambda_0\\psi$", kernels.lifted(generate_flm(_rng, L), 0), [("column", 0)]),
+        ("directional spin-2\n$\\Lambda_2\\psi$", kernels.lifted(_psi2, 2), [("column", -2)]),
+        ("Haar synthesis, spin 2\n$\\widetilde{\\Lambda_2\\psi}$", kernels.flipped(kernels.lifted(_psi2, 2)), [("row", -2)]),
+        ("spin $2\\to1$ multiplier\n$\\Psi_T$", kernels.multiplier(np.ones(L), 2, 1), [("entry", (-1, -2))]),
         (
             "steerable, $s=1$, $N=3$\n$\\sum_{|s'|<3}\\Psi_{T,s'}$",
-            sum(kernel_multiplier(_rng.standard_normal(L) + 1j, 1, _q) for _q in range(-2, 3)),
+            kernels.steerable({_q: _rng.standard_normal(L) + 1j for _q in range(-2, 3)}, 1),
             [("column", -1)],
         ),
         ("group convolution\nany $\\Psi$", random_kernel(L, _rng), [("all", None)]),
-        ("lift $\\Lambda_{2}$ / projection $\\Lambda_2^\\dagger$\nidentity entry", kernel_identity(L, 2), [("entry", (-2, -2))]),
-        ("$E$ from $Q+\\mathrm{i}U$\n$\\mathcal{C}_{2\\to0}$, $c_\\ell=-1/2$", kernel_multiplier(-0.5 * np.ones(L), 2, 0), [("entry", (0, -2))]),
+        ("lift $\\Lambda_{2}$ / projection $\\Lambda_2^\\dagger$\nidentity entry", kernels.identity(L, 2), [("entry", (-2, -2))]),
+        ("$E$ from $Q+\\mathrm{i}U$\n$\\mathcal{C}_{2\\to0}$, $c_\\ell=-1/2$", kernels.multiplier(-0.5 * np.ones(L), 2, 0), [("entry", (0, -2))]),
     ]
     _fig = Figure(figsize=(13, 5.6), layout="constrained")
     for _i, (_title, _K, _read) in enumerate(_gallery):
@@ -758,38 +518,38 @@ def _(L, seed):
 def _(seed):
     _rng = np.random.default_rng(seed + 3)
     _L, _N = L_CHECK, N_CHECK
-    _th, _ph = sphere_grid(_L)
-    _gam = gamma_grid(_N)
+    _th, _ph = transforms.sphere_angles(_L)
+    _gam = lifting.gamma_samples(_N)
     _orders = (np.abs(m_axis(_L)) < _N)[None]  # orders |m| < N: the kernels below are sampled exactly at N
     kernel_rows = []
     for _s in (0, 2):
         _psi = generate_flm(_rng, _L, spin=_s) * _orders
-        _sampled = lift_grid(isht(_psi, _L, _s), _s, _N)
+        _sampled = lifting.lift_samples(transforms.inverse(_psi, _L, _s), _s, _N)
         kernel_rows.append(
             dict(
                 paper="Lemma IV.7(c)",
                 check=f"$\\Lambda_{{{_s}}}\\psi$ sampled on $\\mathrm{{SO}}(3)$, Wigner transformed vs the column $k={-_s}$",
-                error=rel_err(block_from_flmn(wigner_fwd(_sampled, _L, _N)), kernel_lifted(_psi, _s)),
+                error=rel_err(transforms.wigner_forward(_sampled, _L, _N), kernels.lifted(_psi, _s, _N)),
             )
         )
         # tilde Phi(g) = Phi^*(g^{-1}); g^{-1} has Euler angles (pi - gamma, beta, -pi - alpha)
-        _vals = eval_spin(_psi, _s, _th[None, :], (np.pi - _gam)[:, None])
+        _vals = evaluate(_psi, _s, _th[None, :], (np.pi - _gam)[:, None])
         _flipped = (-1) ** _s / np.sqrt(2 * np.pi) * np.exp(-1j * _s * _ph)[None, None, :] * np.conj(_vals)[:, :, None]
         kernel_rows.append(
             dict(
                 paper="Thm V.2, Prop. VI.2",
                 check=f"$\\widetilde{{\\Lambda_{{{_s}}}\\psi}}(g)=(\\Lambda_{{{_s}}}\\psi)^*(g^{{-1}})$ sampled vs the blocks $\\Psi^{{\\ell\\dagger}}$ (row $n={-_s}$)",
-                error=rel_err(block_from_flmn(wigner_fwd(_flipped, _L, _N)), kernel_flip(kernel_lifted(_psi, _s))),
+                error=rel_err(transforms.wigner_forward(_flipped, _L, _N), kernels.flipped(kernels.lifted(_psi, _s), _N)),
             )
         )
     _h = generate_flm(_rng, _L) * _orders
-    _hv = eval_spin(_h, 0, _th[None, :], (np.pi - _gam)[:, None])  # h(beta, pi - gamma) = h(g^{-1} eta)
+    _hv = evaluate(_h, 0, _th[None, :], (np.pi - _gam)[:, None])  # h(beta, pi - gamma) = h(g^{-1} eta)
     _Kh = np.broadcast_to(np.conj(_hv)[:, :, None], (2 * _N - 1, _L, 2 * _L - 1))
     kernel_rows.append(
         dict(
             paper="Prop. VI.4, notes Sec. III",
             check="$\\Psi_h(g)=h^*(g^{-1}\\eta)$ sampled vs the row $(\\Psi_h)^{\\ell}_{0k}=2\\pi\\sqrt{4\\pi/(2\\ell+1)}\\,h^*_{\\ell k}$",
-            error=rel_err(block_from_flmn(wigner_fwd(_Kh, _L, _N)), kernel_left(_h)),
+            error=rel_err(transforms.wigner_forward(_Kh, _L, _N), kernels.left(_h, _N)),
         )
     )
     _f = generate_flm(_rng, _L, spin=2)
@@ -799,9 +559,9 @@ def _(seed):
             paper="Cor. V.6",
             check="identity entry: $\\mathcal{C}_{2\\to G}=\\Lambda_2$, $\\mathcal{C}_{G\\to2}=\\Lambda_2^\\dagger$, $\\mathcal{C}_{2\\to2}=\\mathrm{Id}$",
             error=max(
-                rel_err(lifted_conv(kernel_identity(_L, 2), _f, 2, "G", N_out=3), lift(_f, 2, 3)),
-                rel_err(lifted_conv(kernel_identity(_L, 2), _F, "G", 2), project(_F, 2)),
-                rel_err(lifted_conv(kernel_identity(_L, 2), _f, 2, 2), _f),
+                rel_err(s2conv.lifted_convolution(_f, kernels.identity(_L, 2), 2, "G", N_out=3), lifting.lift(_f, 2, 3)),
+                rel_err(s2conv.lifted_convolution(_F, kernels.identity(_L, 2), "G", 2), lifting.project(_F, 2)),
+                rel_err(s2conv.lifted_convolution(_f, kernels.identity(_L, 2), 2, 2), _f),
             ),
         )
     )
@@ -828,7 +588,7 @@ def _():
 @app.function
 def place_kernel(psi_lm, theta, phi, gamma=0.0):
     """R_rho psi for rho = (phi, theta, gamma): the kernel centred on (theta, phi) and turned by gamma."""
-    return rotate_flm(psi_lm, wigner_D(phi, theta, gamma, psi_lm.shape[0]))
+    return rotate_flm(psi_lm, (phi, theta, gamma))
 
 
 @app.function
@@ -836,14 +596,14 @@ def oriented_kernel(L, sig_long, sig_short, N, ridge=False):
     """An elongated kernel at the North pole with its long axis along the direction gamma = 0, truncated to
     azimuthal orders |m| < N so that it is steerable; ridge=True makes the profile across it zero-mean."""
     L2 = 2 * L
-    th, ph = sphere_grid(L2)
+    th, ph = transforms.sphere_angles(L2)
     T, P = np.meshgrid(th, ph, indexing="ij")
     x, y = T * np.cos(P), T * np.sin(P)
     across = np.exp(-0.5 * (y / sig_short) ** 2)
     if ridge:
         across = across - np.exp(-0.5 * (y / (2.5 * sig_short)) ** 2) / 2.5
     g = np.exp(-0.5 * (x / sig_long) ** 2) * across * (T < np.pi / 2)
-    glm = sht(g, L2)[:L, L2 - L : L2 + L - 1] * (np.abs(m_axis(L)) < N)[None]
+    glm = transforms.forward(g, L2)[:L, L2 - L : L2 + L - 1] * (np.abs(m_axis(L)) < N)[None]
     return glm / np.sqrt(np.sum(np.abs(glm) ** 2))
 
 
@@ -879,20 +639,6 @@ def gaussian_axisymmetric(L, sigma, s=0):
 
 
 @app.function
-def c_eth(L, s):
-    """Spin raising from spin s to s+1: c_l = sqrt((l-s)(l+s+1)) (Eq. 5, Proposition VI.8(a))."""
-    el = np.arange(L)
-    return np.sqrt(np.clip((el - s) * (el + s + 1), 0, None)).astype(np.complex128)
-
-
-@app.function
-def c_ethbar(L, s):
-    """Spin lowering from spin s to s-1: c_l = -sqrt((l+s)(l-s+1)) (Eq. 5, Proposition VI.8(a))."""
-    el = np.arange(L)
-    return -np.sqrt(np.clip((el + s) * (el - s + 1), 0, None)).astype(np.complex128)
-
-
-@app.function
 def spin_from_scalar(f_lm, s):
     """A spin-s field from a scalar by |s| applications of eth (s > 0) or eth-bar (s < 0), each a spin-changing
     lifted convolution C_{q -> q+-1} with the canonical kernel of its multiplier."""
@@ -900,8 +646,8 @@ def spin_from_scalar(f_lm, s):
     out, q = f_lm, 0
     while q != s:
         step = 1 if s > q else -1
-        c = c_eth(L, q) if step == 1 else c_ethbar(L, q)
-        out = lifted_conv(kernel_multiplier(c, q, q + step), out, q, q + step)
+        c = physics.eth_multiplier(L, q) if step == 1 else physics.ethbar_multiplier(L, q)
+        out = s2conv.lifted_convolution(out, kernels.multiplier(c, q, q + step), q, q + step)
         q += step
     return out
 
@@ -921,7 +667,7 @@ def upsample(flm, L_plot):
 def field_grid(flm, s=0, L_plot=128):
     """Samples of a band-limited spin field on the MW grid of band-limit L_plot, with the grid."""
     L_plot = max(L_plot, flm.shape[0])
-    return isht(upsample(flm, L_plot), L_plot, s), sphere_grid(L_plot)
+    return transforms.inverse(upsample(flm, L_plot), L_plot, s), transforms.sphere_angles(L_plot)
 
 
 @app.function
@@ -991,7 +737,7 @@ def orthographic(ax, flm, s=0, part="real", cmap=None, lat0=0.35, lon0=0.6, glyp
         pts = np.stack([np.sqrt(1 - zc**2) * np.cos(az), np.sqrt(1 - zc**2) * np.sin(az), zc], -1)
         pts = pts[pts @ out > 0.2]
         gt, gp = angles_of(pts)
-        z = eval_spin(gflm, gs, gt, gp)
+        z = evaluate(gflm, gs, gt, gp)
         size = glyph_len * (0.35 + 0.65 * np.abs(z) / np.max(np.abs(z)))
         e_t = np.stack([np.cos(gt) * np.cos(gp), np.cos(gt) * np.sin(gp), -np.sin(gt)], -1)
         e_p = np.stack([-np.sin(gp), np.cos(gp), np.zeros_like(gp)], -1)
@@ -1024,8 +770,8 @@ def so3_slice(flmn, gamma, L_plot=128):
     """F(alpha, beta, gamma) at fixed gamma on an MW grid, from the fibre decomposition of Corollary IV.12:
     F(alpha, beta, gamma) = sum_s (2 pi)^{-1/2} e^{-i s gamma} (Lambda_s^dagger F)(beta, alpha)."""
     total, grid = 0.0, None
-    for s in range(-(n_of(flmn) - 1), n_of(flmn)):
-        comp, grid = field_grid(project(flmn, s), s, L_plot)
+    for s in range(-(azimuthal_bandlimit(flmn) - 1), azimuthal_bandlimit(flmn)):
+        comp, grid = field_grid(lifting.project(flmn, s), s, L_plot)
         total = total + np.exp(-1j * s * gamma) * comp / np.sqrt(2 * np.pi)
     return total, grid
 
@@ -1077,8 +823,8 @@ def _():
 
 @app.cell
 def _(N_DIR, f_bars, ridge_lm):
-    F_dir = lifted_conv(kernel_lifted(ridge_lm, 0), f_bars, 0, "G", N_out=N_DIR)  # f (*) psi on SO(3)
-    dir_spins = {q: lifted_conv(kernel_lifted(ridge_lm, 0), f_bars, 0, q) for q in range(-(N_DIR - 1), N_DIR)}
+    F_dir = s2conv.lifted_convolution(f_bars, kernels.lifted(ridge_lm, 0), 0, "G", N_out=N_DIR)  # f (*) psi on SO(3)
+    dir_spins = {q: s2conv.lifted_convolution(f_bars, kernels.lifted(ridge_lm, 0), 0, q) for q in range(-(N_DIR - 1), N_DIR)}
     return F_dir, dir_spins
 
 
@@ -1122,23 +868,24 @@ def _(F_dir, L, N_DIR, dir_spins, f_bars, ridge_lm, seed):
     _expected = np.zeros_like(F_dir)
     for _n in range(-(N_DIR - 1), N_DIR):
         _expected[N_DIR - 1 + _n] = (EIGHT_PI2 / (2 * _el + 1))[:, None] * f_bars * np.conj(ridge_lm[:, L - 1 + _n])[:, None]
-    _samples = wigner_inv(F_dir, L, N_DIR)
-    _steered = [sum(np.exp(-1j * _q * _gm) * isht(_c, L, _q) for _q, _c in dir_spins.items()) / np.sqrt(2 * np.pi) for _gm in gamma_grid(N_DIR)]
+    _samples = transforms.wigner_inverse(F_dir, L, N_DIR)
+    _steered = [sum(np.exp(-1j * _q * _gm) * transforms.inverse(_c, L, _q) for _q, _c in dir_spins.items()) / np.sqrt(2 * np.pi) for _gm in lifting.gamma_samples(N_DIR)]
     directional_rows = [
-        dict(paper="Prop. VI.1, Eq. (18)", check="$\\mathcal{C}_{0\\to G}[\\Lambda_0\\psi]f$ vs $\\frac{8\\pi^2}{2\\ell+1}f_{\\ell m}\\psi^*_{\\ell n}$ (bars, ridge)", error=rel_err(F_dir, _expected)),
+        dict(paper="Prop. VI.1, Eq. (18)", check="$\\mathcal{C}_{0\\to G}[\\Lambda_0\\psi]f$ and `classical.directional_convolution` vs $\\frac{8\\pi^2}{2\\ell+1}f_{\\ell m}\\psi^*_{\\ell n}$ (bars, ridge)",
+             error=max(rel_err(F_dir, _expected), rel_err(classical.directional_convolution(f_bars, ridge_lm, 0, N_DIR), _expected))),
         dict(paper="Prop. VI.6", check="tuple of spin-changing convolutions, steered, vs inverse Wigner transform at the $\\gamma$ samples", error=rel_err(np.array(_steered), _samples)),
     ]
     _rng = np.random.default_rng(seed + 5)
     for _s in (0, 2, -1):
         _f = generate_flm(_rng, L_CHECK, spin=_s)
         _psi = generate_flm(_rng, L_CHECK, spin=_s)
-        _out = lifted_conv(kernel_lifted(_psi, _s), _f, _s, "G")
+        _out = s2conv.lifted_convolution(_f, kernels.lifted(_psi, _s), _s, "G")
         _rots = [random_rotation(_rng) for _ in range(4)]
         directional_rows.append(
             dict(
                 paper="Defs III.3, III.5, Prop. VI.1",
                 check=f"$s={_s}$: $\\mathcal{{C}}_{{{_s}\\to G}}[\\Lambda_{{{_s}}}\\psi]f$ at random $\\rho$ vs $\\langle f,\\mathcal{{R}}_\\rho\\psi\\rangle$ by quadrature, kernel rotated in real space",
-                error=rel_err([eval_so3(_out, *_r) for _r in _rots], [inner_with_rotated(_f, _psi, _s, _r) for _r in _rots]),
+                error=rel_err([evaluate_so3(_out, *_r) for _r in _rots], [inner_with_rotated(_f, _psi, _s, _r) for _r in _rots]),
             )
         )
     check_table(directional_rows)
@@ -1158,8 +905,8 @@ def gl_quadrature(L):
 def rotated_values(psi_lm, s, rotation, theta, phi):
     """(R_rho psi)(omega) = e^{-i s vartheta} psi(R_rho^{-1} omega) in real space (Eq. 12), vartheta the third
     Euler angle of R_rho^{-1} R_omega."""
-    a, b, c = euler_zyz(rot_matrix(*rotation).T @ section(theta, phi))
-    return np.exp(-1j * s * c) * eval_spin(psi_lm, s, b, a)
+    a, b, c = euler_angles(rotation_matrix(*rotation).T @ section(theta, phi))
+    return np.exp(-1j * s * c) * evaluate(psi_lm, s, b, a)
 
 
 @app.function
@@ -1168,15 +915,7 @@ def inner_with_rotated(f_lm, psi_lm, s, rotation, bilinear=False):
     (Definitions III.1, III.3, III.5-III.7); bilinear=True drops the conjugation, as in Definition III.8."""
     T, P, W = gl_quadrature(f_lm.shape[0])
     k = rotated_values(psi_lm, s, rotation, T, P)
-    return np.sum(W * eval_spin(f_lm, s, T, P) * (k if bilinear else np.conj(k)))
-
-
-@app.function
-def eval_so3(flmn, alpha, beta, gamma):
-    """F(alpha, beta, gamma) = sum_l (2l+1)/(8 pi^2) sum_{mn} F^l_{mn} D^{l*}_{mn} (Eq. 7) at one rotation."""
-    N, L = n_of(flmn), flmn.shape[1]
-    D = wigner_D(alpha, beta, gamma, L)[:, :, L - N : L + N - 1]
-    return np.einsum("l,nlm,lmn->", (2 * np.arange(L) + 1) / EIGHT_PI2, flmn, np.conj(D))
+    return np.sum(W * evaluate(f_lm, s, T, P) * (k if bilinear else np.conj(k)))
 
 
 @app.function
@@ -1189,12 +928,12 @@ def left_convolution_quadrature(f_lm, h_lm, theta, phi):
     ang = 2 * np.pi * np.arange(n) / n
     A, B, G = np.meshgrid(ang, np.arccos(x), ang, indexing="ij")
     weights = (2 * np.pi / n) ** 2 * w[None, :, None]
-    R = rot_matrix(A, B, G)
-    f_rho_eta = eval_spin(f_lm, 0, B, A)
+    R = rotation_matrix(A, B, G)
+    f_rho_eta = evaluate(f_lm, 0, B, A)
     out = []
     for t, p in zip(np.atleast_1d(theta), np.atleast_1d(phi)):
         tt, pp = angles_of(np.einsum("...ji,j->...i", R, unit_vector(t, p)))
-        out.append(np.sum(weights * f_rho_eta * eval_spin(h_lm, 0, tt, pp)))
+        out.append(np.sum(weights * f_rho_eta * evaluate(h_lm, 0, tt, pp)))
     return np.array(out)
 
 
@@ -1217,20 +956,22 @@ def _(L, bar_lm, f_bars, seed):
     _m = m_axis(L)
     _el = np.arange(L)
     _psi_ax = gaussian_axisymmetric(L, np.deg2rad(4.0))
-    f_axisym = lifted_conv(kernel_lifted(_psi_ax, 0), f_bars, 0, 0) / np.sqrt(2 * np.pi)
-    f_left = lifted_conv(kernel_left(bar_lm), f_bars, 0, 0)
-    _f_left_zonal = lifted_conv(kernel_left(bar_lm * (_m == 0)[None]), f_bars, 0, 0)
+    f_axisym = s2conv.lifted_convolution(f_bars, kernels.lifted(_psi_ax, 0), 0, 0) / np.sqrt(2 * np.pi)
+    f_left = s2conv.lifted_convolution(f_bars, kernels.left(bar_lm), 0, 0)
+    _f_left_zonal = s2conv.lifted_convolution(f_bars, kernels.left(bar_lm * (_m == 0)[None]), 0, 0)
 
     _fig = Figure(figsize=(13, 3.3), layout="constrained")
     mollweide(_fig.add_subplot(1, 3, 1, projection="mollweide"), f_bars, title="input $f$")
     mollweide(_fig.add_subplot(1, 3, 2, projection="mollweide"), f_axisym, title="$f\\odot\\psi$, Gaussian beam $4°$")
     mollweide(_fig.add_subplot(1, 3, 3, projection="mollweide"), f_left, title="$f\\star_{\\mathrm{L}}b$ with the directional bar $b$")
 
+    _eq14 = np.sqrt(FOUR_PI / (2 * _el + 1))[:, None] * f_bars * np.conj(_psi_ax[:, L - 1])[:, None]
+    _eq16 = 2 * np.pi * np.sqrt(FOUR_PI / (2 * _el + 1))[:, None] * f_bars * bar_lm[:, L - 1][:, None]
     axisym_rows = [
-        dict(paper="Prop. VI.3, Eq. (14)", check="$(2\\pi)^{-1/2}\\mathcal{C}_{0\\to0}[\\Lambda_0\\psi]f$ vs $\\sqrt{4\\pi/(2\\ell+1)}f_{\\ell m}\\psi^*_{\\ell0}$",
-             error=rel_err(f_axisym, np.sqrt(FOUR_PI / (2 * _el + 1))[:, None] * f_bars * np.conj(_psi_ax[:, L - 1])[:, None])),
-        dict(paper="Prop. VI.4, Eq. (16)", check="$\\mathcal{C}_{0\\to0}[\\Psi_b]f$ vs $2\\pi\\sqrt{4\\pi/(2\\ell+1)}f_{\\ell m}b_{\\ell0}$",
-             error=rel_err(f_left, 2 * np.pi * np.sqrt(FOUR_PI / (2 * _el + 1))[:, None] * f_bars * bar_lm[:, L - 1][:, None])),
+        dict(paper="Prop. VI.3, Eq. (14)", check="$(2\\pi)^{-1/2}\\mathcal{C}_{0\\to0}[\\Lambda_0\\psi]f$ and `classical.axisymmetric_convolution` vs $\\sqrt{4\\pi/(2\\ell+1)}f_{\\ell m}\\psi^*_{\\ell0}$",
+             error=max(rel_err(f_axisym, _eq14), rel_err(classical.axisymmetric_convolution(f_bars, _psi_ax), _eq14))),
+        dict(paper="Prop. VI.4, Eq. (16)", check="$\\mathcal{C}_{0\\to0}[\\Psi_b]f$ and `classical.left_convolution` vs $2\\pi\\sqrt{4\\pi/(2\\ell+1)}f_{\\ell m}b_{\\ell0}$",
+             error=max(rel_err(f_left, _eq16), rel_err(classical.left_convolution(f_bars, bar_lm), _eq16))),
         dict(paper="Prop. VI.4", check="only the zonal part enters: $f\\star_{\\mathrm{L}}b$ vs $f\\star_{\\mathrm{L}}b_{\\text{zonal}}$", error=rel_err(f_left, _f_left_zonal)),
     ]
     _rng = np.random.default_rng(seed + 6)
@@ -1238,14 +979,14 @@ def _(L, bar_lm, f_bars, seed):
     _psi = generate_flm(_rng, L_CHECK) * (m_axis(L_CHECK) == 0)[None]
     _h = generate_flm(_rng, L_CHECK)
     _pts_t, _pts_p = np.arccos(_rng.uniform(-0.9, 0.9, 3)), _rng.uniform(0, 2 * np.pi, 3)
-    _ax_out = lifted_conv(kernel_lifted(_psi, 0), _f, 0, 0) / np.sqrt(2 * np.pi)
+    _ax_out = s2conv.lifted_convolution(_f, kernels.lifted(_psi, 0), 0, 0) / np.sqrt(2 * np.pi)
     axisym_rows.append(
         dict(paper="Def. III.1, Prop. VI.3", check="framework vs $\\langle f,\\mathcal{R}_\\omega\\psi\\rangle$ by quadrature at random $\\omega$",
-             error=rel_err(eval_spin(_ax_out, 0, _pts_t, _pts_p), [inner_with_rotated(_f, _psi, 0, (_p, _t, 0.0)) for _t, _p in zip(_pts_t, _pts_p)]))
+             error=rel_err(evaluate(_ax_out, 0, _pts_t, _pts_p), [inner_with_rotated(_f, _psi, 0, (_p, _t, 0.0)) for _t, _p in zip(_pts_t, _pts_p)]))
     )
     axisym_rows.append(
         dict(paper="Def. III.2, Prop. VI.4", check="framework vs $\\int f(\\rho\\eta)h(R_\\rho^{-1}\\omega)\\,\\mathrm{d}\\mu(\\rho)$ by quadrature on $\\mathrm{SO}(3)$",
-             error=rel_err(eval_spin(lifted_conv(kernel_left(_h), _f, 0, 0), 0, _pts_t, _pts_p), left_convolution_quadrature(_f, _h, _pts_t, _pts_p)))
+             error=rel_err(evaluate(s2conv.lifted_convolution(_f, kernels.left(_h), 0, 0), 0, _pts_t, _pts_p), left_convolution_quadrature(_f, _h, _pts_t, _pts_p)))
     )
     mo.vstack([mo.as_html(_fig), check_table(axisym_rows)])
     return axisym_rows, f_axisym, f_left
@@ -1292,12 +1033,17 @@ def _(L, p_spin2, seed):
     _s = 2
     _el = np.arange(L)
     _Phi, _psis = directional_wavelets(L, _s)
-    W_scaling = lifted_conv(kernel_lifted(_Phi, _s), p_spin2, _s, 0) / np.sqrt(2 * np.pi)
-    W_wavelets = [lifted_conv(kernel_lifted(_psi, _s), p_spin2, _s, "G", N_out=3) for _psi in _psis]
-    _recon = lifted_conv(kernel_flip(kernel_lifted(_Phi, _s)), W_scaling, 0, _s) / np.sqrt(2 * np.pi) + sum(
-        lifted_conv(kernel_flip(kernel_lifted(_psi, _s)), _W, "G", _s) for _psi, _W in zip(_psis, W_wavelets)
+    W_scaling = s2conv.lifted_convolution(p_spin2, kernels.lifted(_Phi, _s), _s, 0) / np.sqrt(2 * np.pi)
+    W_wavelets = [s2conv.lifted_convolution(p_spin2, kernels.lifted(_psi, _s), _s, "G", N_out=3) for _psi in _psis]
+    _recon = s2conv.lifted_convolution(W_scaling, kernels.flipped(kernels.lifted(_Phi, _s)), 0, _s) / np.sqrt(2 * np.pi) + sum(
+        s2conv.lifted_convolution(_W, kernels.flipped(kernels.lifted(_psi, _s)), "G", _s) for _psi, _W in zip(_psis, W_wavelets)
+    )
+    _recon_classical = classical.axisymmetric_synthesis(W_scaling, _Phi, _s) + sum(
+        classical.directional_synthesis(_W, _psi, _s) for _psi, _W in zip(_psis, W_wavelets)
     )
     _admissible = (FOUR_PI / (2 * _el + 1)) * np.abs(_Phi[:, L - 1]) ** 2 + (EIGHT_PI2 / (2 * _el + 1)) * sum(np.sum(np.abs(_p) ** 2, axis=1) for _p in _psis)
+    _eq23 = np.stack([(EIGHT_PI2 / (2 * _el + 1))[:, None] * p_spin2 * np.conj(_psis[0][:, L - 1 + _n])[:, None] for _n in (-2, -1, 0, 1, 2)])
+    _eq25 = np.sqrt(FOUR_PI / (2 * _el + 1))[:, None] * p_spin2 * np.conj(_Phi[:, L - 1])[:, None]
 
     _fig = Figure(figsize=(13, 6.2), layout="constrained")
     orthographic(_fig.add_subplot(2, 3, 1), p_spin2, 2, part="abs", title="spin-2 input: $|{}_2f|$ and sticks")
@@ -1309,28 +1055,30 @@ def _(L, p_spin2, seed):
 
     spin_rows = [
         dict(paper="Eq. (27)", check="admissibility $\\frac{4\\pi}{2\\ell+1}|\\Phi_{\\ell0}|^2+\\frac{8\\pi^2}{2\\ell+1}\\sum_{j,n}|\\psi^{(j)}_{\\ell n}|^2=1$, $\\ell\\ge2$", error=rel_err(_admissible[2:], np.ones(L - 2))),
-        dict(paper="Eq. (26), Props VI.2, VI.3", check="synthesis of the wavelet and scaling coefficients reconstructs the spin-2 field", error=rel_err(_recon, p_spin2)),
-        dict(paper="Eq. (23)", check="$\\mathcal{C}_{2\\to G}[\\Lambda_2\\psi^{(0)}]$ vs $\\frac{8\\pi^2}{2\\ell+1}\\,{}_2f_{\\ell m}\\,{}_2\\psi^*_{\\ell n}$",
-             error=rel_err(W_wavelets[0], np.stack([(EIGHT_PI2 / (2 * _el + 1))[:, None] * p_spin2 * np.conj(_psis[0][:, L - 1 + _n])[:, None] for _n in (-2, -1, 0, 1, 2)]))),
-        dict(paper="Eq. (25)", check="$(2\\pi)^{-1/2}\\mathcal{C}_{2\\to0}[\\Lambda_2\\Phi]$ vs $\\sqrt{4\\pi/(2\\ell+1)}\\,{}_2f_{\\ell m}\\,{}_2\\Phi^*_{\\ell0}$",
-             error=rel_err(W_scaling, np.sqrt(FOUR_PI / (2 * _el + 1))[:, None] * p_spin2 * np.conj(_Phi[:, L - 1])[:, None])),
+        dict(paper="Eq. (26), Props VI.2, VI.3", check="synthesis of the wavelet and scaling coefficients reconstructs the spin-2 field (lifted convolutions and `classical` syntheses)",
+             error=max(rel_err(_recon, p_spin2), rel_err(_recon_classical, p_spin2))),
+        dict(paper="Eq. (23)", check="$\\mathcal{C}_{2\\to G}[\\Lambda_2\\psi^{(0)}]$ and `classical.directional_convolution` vs $\\frac{8\\pi^2}{2\\ell+1}\\,{}_2f_{\\ell m}\\,{}_2\\psi^*_{\\ell n}$",
+             error=max(rel_err(W_wavelets[0], _eq23), rel_err(classical.directional_convolution(p_spin2, _psis[0], _s, 3), _eq23))),
+        dict(paper="Eq. (25)", check="$(2\\pi)^{-1/2}\\mathcal{C}_{2\\to0}[\\Lambda_2\\Phi]$ and `classical.axisymmetric_convolution` vs $\\sqrt{4\\pi/(2\\ell+1)}\\,{}_2f_{\\ell m}\\,{}_2\\Phi^*_{\\ell0}$",
+             error=max(rel_err(W_scaling, _eq25), rel_err(classical.axisymmetric_convolution(p_spin2, _Phi, _s), _eq25))),
     ]
     _rng = np.random.default_rng(seed + 8)
     for _s2 in (0, 2):
         _psi = generate_flm(_rng, L_CHECK, spin=_s2)
         _W = generate_flmn(_rng, L_CHECK, L_CHECK)
         _f = generate_flm(_rng, L_CHECK, spin=_s2)
-        _syn = lifted_conv(kernel_flip(kernel_lifted(_psi, _s2)), _W, "G", _s2)
-        _ip_so3 = np.sum(((2 * np.arange(L_CHECK) + 1) / EIGHT_PI2)[None, :, None] * lifted_conv(kernel_lifted(_psi, _s2), _f, _s2, "G") * np.conj(_W))
-        spin_rows.append(dict(paper="Prop. VI.2, Eq. (32)", check=f"$s={_s2}$: $\\mathcal{{C}}_{{G\\to{_s2}}}[\\widetilde{{\\Lambda_{{{_s2}}}\\psi}}]W$ vs $\\sum_nW^{{\\ell}}_{{mn}}\\psi_{{\\ell n}}$",
-                              error=rel_err(_syn, np.einsum("nlm,ln->lm", _W, _psi) * lm_mask(L_CHECK, _s2))))
+        _syn = s2conv.lifted_convolution(_W, kernels.flipped(kernels.lifted(_psi, _s2)), "G", _s2)
+        _ip_so3 = np.sum(((2 * np.arange(L_CHECK) + 1) / EIGHT_PI2)[None, :, None] * s2conv.lifted_convolution(_f, kernels.lifted(_psi, _s2), _s2, "G") * np.conj(_W))
+        _eq32 = np.einsum("nlm,ln->lm", _W, _psi) * lm_mask(L_CHECK, _s2)
+        spin_rows.append(dict(paper="Prop. VI.2, Eq. (32)", check=f"$s={_s2}$: $\\mathcal{{C}}_{{G\\to{_s2}}}[\\widetilde{{\\Lambda_{{{_s2}}}\\psi}}]W$ and `classical.directional_synthesis` vs $\\sum_nW^{{\\ell}}_{{mn}}\\psi_{{\\ell n}}$",
+                              error=max(rel_err(_syn, _eq32), rel_err(classical.directional_synthesis(_W, _psi, _s2), _eq32))))
         spin_rows.append(dict(paper="Prop. VI.2", check=f"$s={_s2}$: synthesis is the adjoint, $\\langle f\\circledast\\psi,W\\rangle=\\langle f,W\\circledast^\\dagger\\psi\\rangle$",
                               error=abs(_ip_so3 - np.sum(_f * np.conj(_syn))) / abs(_ip_so3)))
     _f = generate_flm(_rng, L_CHECK, spin=2)
     _Phi2 = generate_flm(_rng, L_CHECK, spin=2) * (m_axis(L_CHECK) == 0)[None]
     _pts_t, _pts_p = np.arccos(_rng.uniform(-0.9, 0.9, 3)), _rng.uniform(0, 2 * np.pi, 3)
     spin_rows.append(dict(paper="Def. III.6, Prop. VI.3", check="$(2\\pi)^{-1/2}\\mathcal{C}_{2\\to0}[\\Lambda_2\\Phi]$ vs $\\langle{}_2f,\\mathcal{R}_\\omega{}_2\\Phi\\rangle$ by quadrature with the spin phase",
-                          error=rel_err(eval_spin(lifted_conv(kernel_lifted(_Phi2, 2), _f, 2, 0) / np.sqrt(2 * np.pi), 0, _pts_t, _pts_p),
+                          error=rel_err(evaluate(s2conv.lifted_convolution(_f, kernels.lifted(_Phi2, 2), 2, 0) / np.sqrt(2 * np.pi), 0, _pts_t, _pts_p),
                                         [inner_with_rotated(_f, _Phi2, 2, (_p, _t, 0.0)) for _t, _p in zip(_pts_t, _pts_p)])))
     mo.vstack([mo.as_html(_fig), check_table(spin_rows)])
     return W_scaling, W_wavelets, spin_rows
@@ -1353,30 +1101,29 @@ def _(seed):
     _rng = np.random.default_rng(seed + 9)
     _L, _N = L_CHECK, N_CHECK
     _Psi1, _Psi2 = random_kernel(_L, _rng, _N), random_kernel(_L, _rng, _N)  # orders |n|, |k| < N
-    _Psi3 = np.einsum("lab,lbc->lac", _Psi2, _Psi1)
+    _Psi3 = kernels.compose(_Psi2, _Psi1)  # the block product Psi_2^l Psi_1^l
     _F = generate_flmn(_rng, _L, _N)
     _f = generate_flm(_rng, _L, spin=1)
-    _out = lifted_conv(_Psi1, _F, "G", "G", N_out=_N)
-    _samples = wigner_inv(_out, _L, _N)
-    _gam, (_th, _ph) = gamma_grid(_N), sphere_grid(_L)
+    _out = s2conv.lifted_convolution(_F, _Psi1, "G", "G", N_out=_N)
+    _samples = transforms.wigner_inverse(_out, _L, _N)
+    _gam, (_th, _ph) = lifting.gamma_samples(_N), transforms.sphere_angles(_L)
     _errs = []
     for _j, _t, _p in ((0, 2, 5), (3, 7, 1), (8, 4, 12)):
-        _PsiRot = np.einsum("lmk,lkn->lmn", wigner_D(_ph[_p], _th[_t], _gam[_j], _L), _Psi1)  # (pi_G(rho) Psi)^l
-        _PsiRot = _PsiRot[:, :, _L - _N : _L + _N - 1]  # the orders n of the input
-        _value = np.sum(((2 * np.arange(_L) + 1) / EIGHT_PI2)[:, None, None] * np.transpose(_F, (1, 2, 0)) * np.conj(_PsiRot))
+        _PsiRot = rotate_flmn(_Psi1, (_ph[_p], _th[_t], _gam[_j]))  # pi_G(rho) Psi, in the layout of F
+        _value = np.sum(((2 * np.arange(_L) + 1) / EIGHT_PI2)[None, :, None] * _F * np.conj(_PsiRot))
         _errs.append(abs(_samples[_j, _t, _p] - _value) / abs(_value))
     _psi = generate_flm(_rng, _L, spin=1)
     group_rows = [
         dict(paper="Def. III.4, Eq. (20)", check="$\\mathcal{C}_{G\\to G}[\\Psi]F$ on the grid vs $\\langle F,\\pi_G(\\rho)\\Psi\\rangle$ by Parseval with left translation", error=max(_errs)),
         dict(paper="Prop. V.3, Eq. (47)", check="$\\mathcal{C}_{G\\to G}[\\Psi_2]\\,\\mathcal{C}_{G\\to G}[\\Psi_1]=\\mathcal{C}_{G\\to G}[\\Psi_2\\Psi_1]$",
-             error=rel_err(lifted_conv(_Psi2, _out, "G", "G", N_out=_N), lifted_conv(_Psi3, _F, "G", "G", N_out=_N))),
+             error=rel_err(s2conv.lifted_convolution(_out, _Psi2, "G", "G", N_out=_N), s2conv.lifted_convolution(_F, _Psi3, "G", "G", N_out=_N))),
         dict(paper="Prop. V.3", check="$\\mathcal{C}_{G\\to G}[\\Psi_2]\\,\\mathcal{C}_{1\\to G}[\\Lambda_1\\psi]=\\mathcal{C}_{1\\to G}[\\Psi_2\\,\\Lambda_1\\psi]$ (directional then group)",
-             error=rel_err(lifted_conv(_Psi2, lifted_conv(kernel_lifted(_psi, 1), _f, 1, "G"), "G", "G"),
-                           lifted_conv(np.einsum("lab,lbc->lac", _Psi2, kernel_lifted(_psi, 1)), _f, 1, "G"))),
+             error=rel_err(s2conv.lifted_convolution(s2conv.lifted_convolution(_f, kernels.lifted(_psi, 1), 1, "G"), _Psi2, "G", "G"),
+                           s2conv.lifted_convolution(_f, kernels.compose(_Psi2, kernels.lifted(_psi, 1)), 1, "G"))),
         dict(paper="Prop. V.3", check="$\\mathcal{C}_{-2\\to0}[\\Psi_2]\\,\\mathcal{C}_{1\\to-2}[\\Psi_1]$: the multipliers multiply, $c^{(3)}_\\ell=c^{(2)}_\\ell c^{(1)}_\\ell$",
-             error=rel_err(lifted_conv(_Psi2, lifted_conv(_Psi1, _f, 1, -2), -2, 0), apply_multiplier(multiplier(_Psi2, -2, 0) * multiplier(_Psi1, 1, -2), _f, 1, 0))),
+             error=rel_err(s2conv.lifted_convolution(s2conv.lifted_convolution(_f, _Psi1, 1, -2), _Psi2, -2, 0), lifted.spin_multiplier(_f, kernels.to_multiplier(_Psi2, -2, 0) * kernels.to_multiplier(_Psi1, 1, -2), 1, 0))),
         dict(paper="Sec. VI D", check="a lifted input reduces $\\mathcal{C}_{G\\to G}$ to $\\mathcal{C}_{s\\to G}$: $\\mathcal{C}_{G\\to G}[\\Psi]\\Lambda_1f=\\mathcal{C}_{1\\to G}[\\Psi]f$",
-             error=rel_err(lifted_conv(_Psi1, lift(_f, 1, _N), "G", "G", N_out=_N), lifted_conv(_Psi1, _f, 1, "G", N_out=_N))),
+             error=rel_err(s2conv.lifted_convolution(lifting.lift(_f, 1, _N), _Psi1, "G", "G", N_out=_N), s2conv.lifted_convolution(_f, _Psi1, 1, "G", N_out=_N))),
     ]
     check_table(group_rows)
     return (group_rows,)
@@ -1422,7 +1169,7 @@ def radial_profile(c, s, sp, b):
 def two_point_kernel(c, s, sp, x_theta, x_phi, y_theta, y_phi, literal_angles=False):
     """K(x, y) = e^{i s' a} K(b) e^{i s c} with s(x)^{-1} s(y) = Rz(a) Ry(b) Rz(c) (Corollary V.7, Eq. A10);
     literal_angles=True uses the printed first angle a + pi of Tessore et al."""
-    a, b, cc = euler_zyz(section(x_theta, x_phi).T @ section(y_theta, y_phi))
+    a, b, cc = euler_angles(section(x_theta, x_phi).T @ section(y_theta, y_phi))
     if literal_angles:
         a = a + np.pi
     return np.exp(1j * sp * a) * radial_profile(c, s, sp, b) * np.exp(1j * s * cc)
@@ -1432,7 +1179,7 @@ def two_point_kernel(c, s, sp, x_theta, x_phi, y_theta, y_phi, literal_angles=Fa
 def two_point_quadrature(c, s, sp, f_lm, theta, phi, literal_angles=False):
     """(T f)(x) = int K(x, y) f(y) d mu(y) by exact quadrature with the two-point kernel above."""
     T, P, W = gl_quadrature(f_lm.shape[0])
-    fy = eval_spin(f_lm, s, T, P)
+    fy = evaluate(f_lm, s, T, P)
     return np.array([np.sum(W * two_point_kernel(c, s, sp, t, p, T, P, literal_angles) * fy)
                      for t, p in zip(np.atleast_1d(theta), np.atleast_1d(phi))])
 
@@ -1461,7 +1208,7 @@ def _(L, f_smooth, sc_s_ui, sc_sp_ui, sc_width_ui):
     _sigma = np.deg2rad(sc_width_ui.value)
     _c = np.exp(-0.5 * _el * (_el + 1) * _sigma**2)
     _fin = spin_from_scalar(f_smooth, _s)
-    _fout = lifted_conv(kernel_multiplier(_c, _s, _sp), _fin, _s, _sp)
+    _fout = s2conv.lifted_convolution(_fin, kernels.multiplier(_c, _s, _sp), _s, _sp)
 
     _fig = Figure(figsize=(13, 6.4), layout="constrained")
     orthographic(_fig.add_subplot(2, 3, 1), _fin, _s, part="real" if _s == 0 else "abs", title=f"input, spin {_s}")
@@ -1474,7 +1221,7 @@ def _(L, f_smooth, sc_s_ui, sc_sp_ui, sc_width_ui):
     _axp.set_xlabel("separation $b$ (degrees)")
     _axp.set_title("radial profile of the equivariant kernel (Cor. V.7)", fontsize=9)
     _axp.set_xlim(0, 60)
-    _th, _ph = sphere_grid(96)
+    _th, _ph = transforms.sphere_angles(96)
     _T, _P = np.meshgrid(_th, _ph, indexing="ij")
     _K = two_point_kernel(_c, _s, _sp, np.pi / 2, 0.0, _T, _P)
     mollweide_grid(_fig.add_subplot(2, 3, 4, projection="mollweide"), np.abs(_K), _th, _ph, cmap="YlGnBu", symmetric=False, title="$|K(x,y)|$: radial")
@@ -1496,10 +1243,10 @@ def _(sc_s_ui, sc_sp_ui, seed):
     _c = _rng.standard_normal(_L) + 1j * _rng.standard_normal(_L)
     _f = generate_flm(_rng, _L, spin=_s)
     _pts_t, _pts_p = np.arccos(_rng.uniform(-0.9, 0.9, 3)), _rng.uniform(0, 2 * np.pi, 3)
-    _out = lifted_conv(kernel_multiplier(_c, _s, _sp), _f, _s, _sp)
-    _at_pts = eval_spin(_out, _sp, _pts_t, _pts_p)
+    _out = s2conv.lifted_convolution(_f, kernels.multiplier(_c, _s, _sp), _s, _sp)
+    _at_pts = evaluate(_out, _sp, _pts_t, _pts_p)
     spinchange_rows = [
-        dict(paper="Thm V.5, Prop. VI.5", check=f"$\\mathcal{{C}}_{{{_s}\\to{_sp}}}[\\Psi_T]$ vs the multiplier $c_\\ell\\,{{}}_sf_{{\\ell m}}$", error=rel_err(_out, apply_multiplier(_c, _f, _s, _sp))),
+        dict(paper="Thm V.5, Prop. VI.5", check=f"$\\mathcal{{C}}_{{{_s}\\to{_sp}}}[\\Psi_T]$ vs the multiplier $c_\\ell\\,{{}}_sf_{{\\ell m}}$", error=rel_err(_out, _c[:, None] * _f * lm_mask(_L, max(abs(_s), abs(_sp))))),
         dict(paper="Cor. V.7, Eq. (A10)", check="framework vs quadrature with the radial kernel $e^{\\mathrm{i}s'a}K(b)e^{\\mathrm{i}sc}$ (Tessore et al., canonical angles)",
              error=rel_err(_at_pts, two_point_quadrature(_c, _s, _sp, _f, _pts_t, _pts_p))),
         dict(paper="Prop. VI.5(c)", check="Tessore et al., literal angles $a+\\pi$: quadrature equals $(-1)^{s'}$ times the canonical result",
@@ -1509,22 +1256,22 @@ def _(sc_s_ui, sc_sp_ui, seed):
     _psi = np.zeros((_L, 2 * _L - 1), np.complex128)
     _psi[:, _L - 1 - _sp] = (-1) ** _sp * np.sqrt((2 * _el + 1) / EIGHT_PI2) * np.conj(_c)
     spinchange_rows.append(dict(paper="Prop. VI.5(a), notes Sec. III", check="Esteves et al. Eq. (13) as a lifted spherical kernel with ${}_s\\psi_{\\ell,-s'}=(-1)^{s'}\\sqrt{(2\\ell+1)/8\\pi^2}\\,k^*_\\ell$",
-                                error=rel_err(lifted_conv(kernel_lifted(_psi * lm_mask(_L, _s), _s), _f, _s, _sp), _out)))
+                                error=rel_err(s2conv.lifted_convolution(_f, kernels.lifted(_psi * lm_mask(_L, _s), _s), _s, _sp), _out)))
     _k = generate_flm(_rng, _L, spin=_s)
-    _reference = apply_multiplier(np.conj(_k[:, _L - 1 + _sp]), _f, _s, _sp)
+    _reference = np.conj(_k[:, _L - 1 + _sp])[:, None] * _f * lm_mask(_L, max(abs(_s), abs(_sp)))
     _kprime = ((-1.0) ** m_axis(_L))[None, :] * np.sqrt((2 * _el + 1) / EIGHT_PI2)[:, None] * _k[:, ::-1] * lm_mask(_L, _s)
     spinchange_rows.append(dict(paper="Prop. VI.5(a), notes Eq. (4)", check="Esteves et al. Eq. (15) $g^{s'}_{\\ell m}=f^{s}_{\\ell m}k^{s*}_{\\ell s'}$ via the reparameterised kernel $k'_{\\ell n}=(-1)^n\\sqrt{(2\\ell+1)/8\\pi^2}\\,k_{\\ell,-n}$",
-                                error=rel_err(lifted_conv(kernel_lifted(_kprime, _s), _f, _s, _sp), _reference)))
+                                error=rel_err(s2conv.lifted_convolution(_f, kernels.lifted(_kprime, _s), _s, _sp), _reference)))
     spinchange_rows.append(dict(paper="notes Sec. III", check="lifting the unmodified Esteves kernel instead gives a different operator (should differ)",
-                                error=rel_err(lifted_conv(kernel_lifted(_k, _s), _f, _s, _sp), _reference), expect="differ"))
+                                error=rel_err(s2conv.lifted_convolution(_f, kernels.lifted(_k, _s), _s, _sp), _reference), expect="differ"))
     # Geller & Marinucci spin needlets: c_jl = b(sqrt(e_ls) / B^j) with sum_j c_jl^2 = 1 for l > |s|
     _eig = np.sqrt(np.clip((_el - abs(_s)) * (_el + abs(_s) + 1.0), 0, None))
     _needlets = [needlet_window(_eig / 2.0**_j) for _j in range(6)]
     _keep = _el > abs(_s)
     spinchange_rows.append(dict(paper="Prop. VI.5(b)", check="spin needlets: $\\sum_j\\mathcal{C}_{s\\to s}[b_j]\\,\\mathcal{C}_{s\\to s}[b_j]=\\mathrm{Id}$ for $\\ell>|s|$ (composition)",
-                                error=rel_err(sum(lifted_conv(kernel_multiplier(_b, _s, _s), lifted_conv(kernel_multiplier(_b, _s, _s), _f, _s, _s), _s, _s) for _b in _needlets), _f * _keep[:, None])))
+                                error=rel_err(sum(s2conv.lifted_convolution(s2conv.lifted_convolution(_f, kernels.multiplier(_b, _s, _s), _s, _s), kernels.multiplier(_b, _s, _s), _s, _s) for _b in _needlets), _f * _keep[:, None])))
     spinchange_rows.append(dict(paper="Prop. VI.5(b)", check="mixed needlets: $\\sum_j\\mathcal{C}_{0\\to s}[b_j]\\,\\mathcal{C}_{s\\to0}[b_j]=\\mathrm{Id}$ for $\\ell>|s|$",
-                                error=rel_err(sum(lifted_conv(kernel_multiplier(_b, 0, _s), lifted_conv(kernel_multiplier(_b, _s, 0), _f, _s, 0), 0, _s) for _b in _needlets), _f * _keep[:, None])))
+                                error=rel_err(sum(s2conv.lifted_convolution(s2conv.lifted_convolution(_f, kernels.multiplier(_b, _s, 0), _s, 0), kernels.multiplier(_b, 0, _s), 0, _s) for _b in _needlets), _f * _keep[:, None])))
     check_table(spinchange_rows)
     return (spinchange_rows,)
 
@@ -1539,15 +1286,6 @@ def _():
     The $E$/$B$ decomposition of a spin-$\pm2$ polarisation field, $a_E=-\tfrac12(a_2+a_{-2})$ and $a_B=\tfrac{\mathrm{i}}2(a_2-a_{-2})$, is a sum of a $\mathcal{C}_{2\to0}$ and a $\mathcal{C}_{-2\to0}$ operator.  The spherical Kaiser–Squires relation between the convergence $\kappa$ and the shear $\gamma$ of weak lensing is the multiplier $\mathcal{C}_{0\to2}$ with $\mathcal{D}_\ell=-\sqrt{(\ell+2)(\ell-1)/(\ell(\ell+1))}$.  By Proposition V.3 it is the ratio of the multipliers of $\tfrac12\eth^2$ and $\tfrac12\bar\eth\eth$.
     """)
     return
-
-
-@app.function
-def c_kaiser_squires(L):
-    """D_l = -sqrt((l+2)(l-1)/(l(l+1))) from convergence (spin 0) to shear (spin 2) for l >= 2 (Proposition VI.8(c))."""
-    el = np.arange(L).astype(float)
-    D = np.zeros(L, np.complex128)
-    D[2:] = -np.sqrt((el[2:] + 2) * (el[2:] - 1) / (el[2:] * (el[2:] + 1)))
-    return D
 
 
 @app.cell
@@ -1570,13 +1308,13 @@ def _(L, seed):
     _aE = smooth_field(L, _rng, 5.0, el_min=2)
     _aB = 0.6 * smooth_field(L, _rng, 5.0, el_min=2)
     _a2, _am2 = -(_aE + 1j * _aB), -(_aE - 1j * _aB)
-    _P, _Pbar = isht(_a2, L, 2), isht(_am2, L, -2)
-    _p2, _pm2 = sht(_P, L, 2), sht(_Pbar, L, -2)
-    _E = lifted_conv(kernel_multiplier(-_half, 2, 0), _p2, 2, 0) + lifted_conv(kernel_multiplier(-_half, -2, 0), _pm2, -2, 0)
-    _B = lifted_conv(kernel_multiplier(1j * _half, 2, 0), _p2, 2, 0) + lifted_conv(kernel_multiplier(-1j * _half, -2, 0), _pm2, -2, 0)
+    _P, _Pbar = transforms.inverse(_a2, L, 2), transforms.inverse(_am2, L, -2)
+    _p2, _pm2 = transforms.forward(_P, L, 2), transforms.forward(_Pbar, L, -2)
+    _E = s2conv.lifted_convolution(_p2, kernels.multiplier(-_half, 2, 0), 2, 0) + s2conv.lifted_convolution(_pm2, kernels.multiplier(-_half, -2, 0), -2, 0)
+    _B = s2conv.lifted_convolution(_p2, kernels.multiplier(1j * _half, 2, 0), 2, 0) + s2conv.lifted_convolution(_pm2, kernels.multiplier(-1j * _half, -2, 0), -2, 0)
     _kappa = smooth_field(L, _rng, 5.0, el_min=2)
-    _D = c_kaiser_squires(L)
-    _shear = lifted_conv(kernel_multiplier(_D, 0, 2), _kappa, 0, 2)
+    _D = physics.kaiser_squires_multiplier(L)
+    _shear = s2conv.lifted_convolution(_kappa, kernels.multiplier(_D, 0, 2), 0, 2)
     _Dinv = np.where(_el >= 2, 1 / np.where(_D == 0, 1, _D), 0)
     _zs = np.array([np.sqrt(np.prod(np.arange(_l - 1, _l + 3, dtype=float))) if _l >= 2 else 0.0 for _l in range(L)])
 
@@ -1591,24 +1329,27 @@ def _(L, seed):
     physics_rows = []
     for _s in (0, 1, -2):
         _f = generate_flm(_rng, L_CHECK, spin=_s)
-        _vals = lambda _t, _p, _f=_f, _s=_s: eval_spin(_f, _s, _t, _p)
+        _vals = lambda _t, _p, _f=_f, _s=_s: evaluate(_f, _s, _t, _p)
         _dt = (-_vals(_pts_t + 2 * _hstep, _pts_p) + 8 * _vals(_pts_t + _hstep, _pts_p) - 8 * _vals(_pts_t - _hstep, _pts_p) + _vals(_pts_t - 2 * _hstep, _pts_p)) / (12 * _hstep)
         _dp = (-_vals(_pts_t, _pts_p + 2 * _hstep) + 8 * _vals(_pts_t, _pts_p + _hstep) - 8 * _vals(_pts_t, _pts_p - _hstep) + _vals(_pts_t, _pts_p - 2 * _hstep)) / (12 * _hstep)
         _f0 = _vals(_pts_t, _pts_p)
         _eth_fd = -(_dt - _s / np.tan(_pts_t) * _f0 + 1j / np.sin(_pts_t) * _dp)
         _ethbar_fd = -(_dt + _s / np.tan(_pts_t) * _f0 - 1j / np.sin(_pts_t) * _dp)
-        _eth = eval_spin(lifted_conv(kernel_multiplier(c_eth(L_CHECK, _s), _s, _s + 1), _f, _s, _s + 1), _s + 1, _pts_t, _pts_p)
-        _ethbar = eval_spin(lifted_conv(kernel_multiplier(c_ethbar(L_CHECK, _s), _s, _s - 1), _f, _s, _s - 1), _s - 1, _pts_t, _pts_p)
+        _eth = evaluate(physics.eth(_f, _s), _s + 1, _pts_t, _pts_p)
+        _ethbar = evaluate(physics.ethbar(_f, _s), _s - 1, _pts_t, _pts_p)
         physics_rows.append(dict(paper="Prop. VI.8(a), Eq. (3)", check=f"$\\eth$ and $\\bar\\eth$ on spin {_s} vs fourth-order finite differences of the differential operators (3)",
                                  error=max(rel_err(_eth, _eth_fd), rel_err(_ethbar, _ethbar_fd))))
     physics_rows += [
         dict(paper="Prop. VI.8(b)", check="$Q-\\mathrm{i}U$ is the conjugate of $Q+\\mathrm{i}U$ for real $E$, $B$", error=rel_err(_Pbar, np.conj(_P))),
-        dict(paper="Prop. VI.8(b)", check="$E$ and $B$ recovered by sums of $\\mathcal{C}_{2\\to0}$ and $\\mathcal{C}_{-2\\to0}$", error=max(rel_err(_E, _aE), rel_err(_B, _aB))),
+        dict(paper="Prop. VI.8(b)", check="$E$ and $B$ recovered by sums of $\\mathcal{C}_{2\\to0}$ and $\\mathcal{C}_{-2\\to0}$, and by `physics.eb_decomposition`",
+             error=max(rel_err(_E, _aE), rel_err(_B, _aB), *(rel_err(_x, _y) for _x, _y in zip(physics.eb_decomposition(_p2, _pm2), (_aE, _aB))))),
         dict(paper="Prop. VI.8(b)", check="$\\bar\\eth^2$ on spin 2 and $\\eth^2$ on spin $-2$: $c_\\ell=\\sqrt{(\\ell+2)!/(\\ell-2)!}$ (composition)",
-             error=max(rel_err((c_ethbar(L, 1) * c_ethbar(L, 2))[2:], _zs[2:]), rel_err((c_eth(L, -1) * c_eth(L, -2))[2:], _zs[2:]))),
+             error=max(rel_err((physics.ethbar_multiplier(L, 1) * physics.ethbar_multiplier(L, 2))[2:], _zs[2:]), rel_err((physics.eth_multiplier(L, -1) * physics.eth_multiplier(L, -2))[2:], _zs[2:]))),
         dict(paper="Props VI.8(c), V.3", check="Kaiser–Squires $\\mathcal{D}_\\ell$ = multiplier of $\\frac12\\eth^2$ over that of $\\frac12\\bar\\eth\\eth$",
-             error=rel_err((c_eth(L, 0) * c_eth(L, 1))[2:] / (c_ethbar(L, 1) * c_eth(L, 0))[2:], _D[2:])),
-        dict(paper="Prop. VI.8(c)", check="$\\mathcal{C}_{2\\to0}[\\mathcal{D}^{-1}]\\,\\mathcal{C}_{0\\to2}[\\mathcal{D}]\\kappa=\\kappa$", error=rel_err(lifted_conv(kernel_multiplier(_Dinv, 2, 0), _shear, 2, 0), _kappa)),
+             error=rel_err((physics.eth_multiplier(L, 0) * physics.eth_multiplier(L, 1))[2:] / (physics.ethbar_multiplier(L, 1) * physics.eth_multiplier(L, 0))[2:], _D[2:])),
+        dict(paper="Prop. VI.8(c)", check="$\\mathcal{C}_{2\\to0}[\\mathcal{D}^{-1}]\\,\\mathcal{C}_{0\\to2}[\\mathcal{D}]\\kappa=\\kappa$, and with `physics.kaiser_squires` and its inverse",
+             error=max(rel_err(s2conv.lifted_convolution(_shear, kernels.multiplier(_Dinv, 2, 0), 2, 0), _kappa),
+                       rel_err(physics.kaiser_squires(_kappa), _shear), rel_err(physics.kaiser_squires_inverse(_shear), _kappa))),
     ]
     mo.vstack([mo.as_html(_fig), check_table(physics_rows)])
     return (physics_rows,)
@@ -1635,29 +1376,27 @@ def _():
 
 
 @app.function
-def section_components(Psi, f_lm, s, N):
-    """The spin components (2 pi)^{-1/2} C_{s -> s'}[Psi] f, |s'| < N, of Proposition VII.1."""
-    return {sp: lifted_conv(Psi, f_lm, s, sp) / np.sqrt(2 * np.pi) for sp in range(-(N - 1), N)}
-
-
-@app.function
+@functools.partial(jax.jit, static_argnames=("chi",))
 def section_at(components, theta, phi, chi=None):
-    """E_sigma[Psi] f = sum_{s'} e^{-i s' chi_sigma} (2 pi)^{-1/2} C_{s -> s'}[Psi] f (Eq. 63) at arbitrary points;
-    chi is the function chi_sigma(theta, phi), or None for the coordinate section."""
+    """E_sigma[Psi] f = sum_{s'} e^{-i s' chi_sigma} (2 pi)^{-1/2} C_{s -> s'}[Psi] f (Eq. 63) at arbitrary points, from
+    the spin components of s2conv.section.section_components, stacked over s' = -(N-1), ..., N-1; chi is the function
+    chi_sigma(theta, phi), or None for the coordinate section.  JIT compiled, as the equivariance tests call it often."""
+    N = azimuthal_bandlimit(components)
     total = 0.0
-    for sp, comp in components.items():
-        values = eval_spin(comp, sp, theta, phi)
-        total = total + (values if chi is None else np.exp(-1j * sp * chi(theta, phi)) * values)
+    for sp, comp in zip(range(-(N - 1), N), components):
+        values = evaluate(comp, sp, theta, phi)
+        total = total + (values if chi is None else jnp.exp(-1j * sp * chi(theta, phi)) * values)
     return total
 
 
 @app.function
 def section_on_grid(components, L_plot=128, chi=None):
     """E_sigma[Psi] f on the MW grid of band-limit L_plot, with one inverse spin transform per component."""
-    th, ph = sphere_grid(L_plot)
+    th, ph = transforms.sphere_angles(L_plot)
     T, P = np.meshgrid(th, ph, indexing="ij")
+    N = azimuthal_bandlimit(components)
     total = 0.0
-    for sp, comp in components.items():
+    for sp, comp in zip(range(-(N - 1), N), components):
         values = field_grid(comp, sp, L_plot)[0]
         total = total + (values if chi is None else np.exp(-1j * sp * chi(T, P)) * values)
     return total, (th, ph)
@@ -1671,11 +1410,11 @@ def chi_sadeghi(theta, phi):
 
 @app.cell
 def _(L, N_DIR, dir_spins, f_bars, ridge_lm, seed):
-    _el, _m = np.arange(L), m_axis(L)
-    _comps = section_components(kernel_lifted(ridge_lm, 0), f_bars, 0, N_DIR)
+    _el = np.arange(L)
+    _comps = s2conv.section.section_components(f_bars, kernels.lifted(ridge_lm, 0), 0, N_DIR)
     _std, (_th, _ph) = section_on_grid(_comps, 128)
-    _sad, _ = section_on_grid(section_components(kernel_lifted(conj_field_lm(ridge_lm, 0), 0), f_bars, 0, N_DIR), 128, chi_sadeghi)
-    _sift = field_grid(f_bars * np.conj(ridge_lm), 0, 128)[0]
+    _sad, _ = section_on_grid(s2conv.section.section_components(f_bars, kernels.lifted(conjugate(ridge_lm, 0), 0), 0, N_DIR), 128, chi_sadeghi)
+    _sift = field_grid(diagonal.sifting_convolution(f_bars, ridge_lm), 0, 128)[0]
     _fig = Figure(figsize=(13, 6.4), layout="constrained")
     mollweide_grid(_fig.add_subplot(2, 2, 1, projection="mollweide"), _std.real, _th, _ph, title="standard correlation $E_{\\sigma_0}[\\Lambda_0\\psi]f$ (polar-equivariant)")
     mollweide_grid(_fig.add_subplot(2, 2, 2, projection="mollweide"), _sad.real, _th, _ph, title="commutative anisotropic $\\psi\\odot_{\\mathrm{S}}f$, $\\chi_\\sigma=\\pi-\\varphi$")
@@ -1684,39 +1423,36 @@ def _(L, N_DIR, dir_spins, f_bars, ridge_lm, seed):
     _fig.suptitle("Four ways to keep the output of a directional kernel on the sphere", fontsize=10)
 
     # standard correlation four ways at the demonstration band-limit
-    _dirG = wigner_inv(lifted_conv(kernel_lifted(ridge_lm, 0), f_bars, 0, "G", N_out=N_DIR), L, N_DIR)[0]
-    _std_L = section_on_grid(_comps, L)[0]
-    _wiaux = sum(isht(((-1) ** _n * np.sqrt(FOUR_PI / (2 * _el + 1)) * np.conj(ridge_lm[:, L - 1 - _n]))[:, None] * f_bars * lm_mask(L, _n), L, _n) for _n in range(-(N_DIR - 1), N_DIR))
-    _Delta = delta_matrices(L)
-    _ip = (1j) ** _m
-    _Gk = np.einsum("n,lkn,ln->lk", np.conj(_ip), _Delta, np.conj(ridge_lm))
-    _H = np.einsum("m,lkm,lm,lk->mk", _ip, _Delta, f_bars, _Gk)
-    _thL, _phL = sphere_grid(L)
+    _dirG = transforms.wigner_inverse(s2conv.lifted_convolution(f_bars, kernels.lifted(ridge_lm, 0), 0, "G", N_out=N_DIR), L, N_DIR)[0]
+    _std_L = s2conv.section.standard_correlation(f_bars, ridge_lm, N_DIR)
+    _wiaux = sum(transforms.inverse(((-1) ** _n * np.sqrt(FOUR_PI / (2 * _el + 1)) * np.conj(ridge_lm[:, L - 1 - _n]))[:, None] * f_bars * lm_mask(L, _n), L, _n) for _n in range(-(N_DIR - 1), N_DIR))
+    _H = s2conv.section.standard_correlation_fourier(f_bars, ridge_lm)
+    _thL, _phL = transforms.sphere_angles(L)
     _TL, _PL = np.meshgrid(_thL, _phL, indexing="ij")
     beyond_rows = [
-        dict(paper="Prop. VII.1, Def. III.7", check="standard correlation: section evaluation (Eq. 63) vs directional convolution at $\\gamma=0$", error=rel_err(_std_L, _dirG)),
+        dict(paper="Prop. VII.1, Def. III.7", check="standard correlation: section evaluation (Eq. 63), `section.standard_correlation`, vs directional convolution at $\\gamma=0$", error=rel_err(_std_L, _dirG)),
         dict(paper="Sec. VII A (Wiaux et al.)", check="standard correlation: $\\sum_n\\sum_{\\ell m}(-1)^n\\sqrt{4\\pi/(2\\ell+1)}\\,\\psi^*_{\\ell,-n}f_{\\ell m}\\,{}_nY_{\\ell m}$", error=rel_err(_wiaux, _dirG)),
-        dict(paper="App. B 8, Eqs. (B26), (B27)", check="standard correlation: $\\mathcal{O}(L^3)$ grid algorithm by factorisation of rotations", error=rel_err(eval_fourier(_H, _TL, _PL), _dirG)),
+        dict(paper="App. B 8, Eqs. (B26), (B27)", check="standard correlation: $\\mathcal{O}(L^3)$ grid algorithm by factorisation of rotations, `section.standard_correlation_fourier`", error=rel_err(evaluate_fourier(_H, _TL, _PL), _dirG)),
     ]
     _rng = np.random.default_rng(seed + 12)
     _f, _h, _g = generate_flm(_rng, L_CHECK), generate_flm(_rng, L_CHECK), generate_flm(_rng, L_CHECK)
     _pts_t, _pts_p = np.arccos(_rng.uniform(-0.9, 0.9, 3)), _rng.uniform(0, 2 * np.pi, 3)
-    _std_c = section_components(kernel_lifted(_h, 0), _f, 0, L_CHECK)
+    _std_c = s2conv.section.section_components(_f, kernels.lifted(_h, 0), 0, L_CHECK)
     beyond_rows.append(dict(paper="Def. III.7", check="standard correlation (general kernel) vs $\\langle f,\\mathcal{R}_{(\\varphi,\\theta,0)}\\psi\\rangle$ by quadrature",
                             error=rel_err(section_at(_std_c, _pts_t, _pts_p), [inner_with_rotated(_f, _h, 0, (_p, _t, 0.0)) for _t, _p in zip(_pts_t, _pts_p)])))
-    _sad_fh = section_components(kernel_lifted(conj_field_lm(_h, 0), 0), _f, 0, L_CHECK)
-    _sad_hf = section_components(kernel_lifted(conj_field_lm(_f, 0), 0), _h, 0, L_CHECK)
+    _sad_fh = s2conv.section.section_components(_f, kernels.lifted(conjugate(_h, 0), 0), 0, L_CHECK)
+    _sad_hf = s2conv.section.section_components(_h, kernels.lifted(conjugate(_f, 0), 0), 0, L_CHECK)
     beyond_rows.append(dict(paper="Def. III.8, Prop. VII.1", check="commutative anisotropic: section $\\chi_\\sigma=\\pi-\\varphi$ vs $\\int(\\mathcal{R}_{(\\varphi,\\theta,\\pi-\\varphi)}h)f$ by quadrature",
                             error=rel_err(section_at(_sad_fh, _pts_t, _pts_p, chi_sadeghi), [inner_with_rotated(_f, _h, 0, (_p, _t, np.pi - _p), bilinear=True) for _t, _p in zip(_pts_t, _pts_p)])))
     beyond_rows.append(dict(paper="Def. III.8 (Sadeghi et al.)", check="commutativity $h\\odot_{\\mathrm{S}}f=f\\odot_{\\mathrm{S}}h$",
                             error=rel_err(section_at(_sad_fh, _pts_t, _pts_p, chi_sadeghi), section_at(_sad_hf, _pts_t, _pts_p, chi_sadeghi))))
-    _th12, _ph12 = sphere_grid(L_CHECK)
+    _th12, _ph12 = transforms.sphere_angles(L_CHECK)
     _rev = (-np.arange(2 * L_CHECK - 1)) % (2 * L_CHECK - 1)
     beyond_rows.append(dict(paper="Def. III.9", check="sifting: $(f\\circledcirc g)(\\theta,\\varphi)=[(g\\circledcirc f)(\\theta,-\\varphi)]^*$",
-                            error=rel_err(isht(_f * np.conj(_g), L_CHECK), np.conj(isht(_g * np.conj(_f), L_CHECK)[:, _rev]))))
+                            error=rel_err(transforms.inverse(diagonal.sifting_convolution(_f, _g), L_CHECK), np.conj(transforms.inverse(diagonal.sifting_convolution(_g, _f), L_CHECK)[:, _rev]))))
     _g_iso = np.repeat(_g[:, L_CHECK - 1 : L_CHECK], 2 * L_CHECK - 1, axis=1) * lm_mask(L_CHECK)
     beyond_rows.append(dict(paper="Prop. VII.2", check="an $m$-independent multiplier $g_{\\ell m}=g_{\\ell0}$ is $\\mathcal{C}_{0\\to0}[\\Psi_T]$ with $c_\\ell=g_{\\ell0}$",
-                            error=rel_err(_g_iso * _f, lifted_conv(kernel_multiplier(_g[:, L_CHECK - 1], 0, 0), _f, 0, 0))))
+                            error=rel_err(diagonal.harmonic_multiplication(_f, _g_iso), s2conv.lifted_convolution(_f, kernels.multiplier(_g[:, L_CHECK - 1], 0, 0), 0, 0))))
     mo.vstack([mo.as_html(_fig), check_table(beyond_rows)])
     return (beyond_rows,)
 
@@ -1766,10 +1502,9 @@ def equivariance_error(apply, fields, s_out, rotations, group_input=False):
     maps = [apply(f) for f in fields]
     errors = []
     for rotation in rotations:
-        D = wigner_D(*rotation, L)
-        a, b, c = euler_zyz(rot_matrix(*rotation).T @ section(theta, phi))
+        a, b, c = euler_angles(rotation_matrix(*rotation).T @ section(theta, phi))
         for f, Tf in zip(fields, maps):
-            lhs = apply(rotate_flmn(f, D) if group_input else rotate_flm(f, D))(theta, phi)
+            lhs = apply(rotate_flmn_jit(f, rotation) if group_input else rotate_flm_jit(f, rotation))(theta, phi)
             errors.append(l2_rel_err(lhs, np.exp(-1j * s_out * c) * Tf(b, a), weights))
     return float(np.mean(errors))
 
@@ -1784,23 +1519,22 @@ def equivariance_error_group(apply, inputs, rotations, group_input=False):
     outputs = [apply(x) for x in inputs]
     errors = []
     for rotation in rotations:
-        D = wigner_D(*rotation, L)
         for x, Tx in zip(inputs, outputs):
-            lhs = apply(rotate_flmn(x, D) if group_input else rotate_flm(x, D))
-            errors.append(l2_rel_err(lhs, rotate_flmn(Tx, D), weights))
+            lhs = apply(rotate_flmn_jit(x, rotation) if group_input else rotate_flm_jit(x, rotation))
+            errors.append(l2_rel_err(lhs, rotate_flmn_jit(Tx, rotation), weights))
     return float(np.mean(errors))
 
 
 @app.function
 def on_sphere(Psi, s, sp):
     """The map f -> C_{s -> s'}[Psi] f as a function of (theta, phi), for equivariance tests."""
-    return lambda f: (lambda t, p: eval_spin(lifted_conv(Psi, f, s, sp), sp, t, p))
+    return lambda f: functools.partial(evaluate_jit, lifted_convolution_jit(f, Psi, s, sp), sp)
 
 
 @app.function
 def section_map(Psi, s, N, chi=None):
     """The section evaluation f -> E_sigma[Psi] f as a function of (theta, phi), a scalar in the coordinate frame."""
-    return lambda f: (lambda t, p: section_at(section_components(Psi, f, s, N), t, p, chi))
+    return lambda f: functools.partial(section_at, section_components_jit(f, Psi, s, N), chi=chi)
 
 
 @app.cell
@@ -1818,7 +1552,8 @@ def _(seed):
     _psi2 = generate_flm(_rng, _L, spin=2)
     _F = [generate_flmn(_rng, _L, _L) for _ in range(N_EQ_FIELDS)]
     _Psi = random_kernel(_L, _rng)
-    _even = conj_field_lm(_psi * (_m % 2 == 0)[None], 0)
+    _even = conjugate(_psi * (_m % 2 == 0)[None], 0)
+    _g_zonal = np.repeat(_psi[:, _L - 1 : _L], 2 * _L - 1, axis=1)  # an m-independent multiplier g_lm = psi_l0
 
     def _row(name, error, expect="agree", rotation=f"{N_EQ_ROTATIONS} random rotations"):
         return dict(paper=name, check=f"{rotation}: {'equivariant' if expect == 'agree' else 'not equivariant'}", error=error, expect=expect)
@@ -1827,30 +1562,30 @@ def _(seed):
         _row("$\\mathcal{C}_{0\\to0}[\\Psi]$", equivariance_error(on_sphere(_Psi, 0, 0), _f0, 0, _rot)),
         _row("$\\mathcal{C}_{2\\to1}[\\Psi]$", equivariance_error(on_sphere(_Psi, 2, 1), _f2, 1, _rot)),
         _row("$\\mathcal{C}_{-1\\to2}[\\Psi]$", equivariance_error(on_sphere(_Psi, -1, 2), _fm1, 2, _rot)),
-        _row("axisymmetric $(2\\pi)^{-1/2}\\mathcal{C}_{0\\to0}[\\Lambda_0\\psi_{\\text{zonal}}]$", equivariance_error(on_sphere(kernel_lifted(_psi * (_m == 0)[None], 0), 0, 0), _f0, 0, _rot)),
-        _row("left $\\mathcal{C}_{0\\to0}[\\Psi_h]$", equivariance_error(on_sphere(kernel_left(_psi), 0, 0), _f0, 0, _rot)),
-        _row("spin axisymmetric $\\mathcal{C}_{2\\to0}[\\Lambda_2\\Phi]$", equivariance_error(on_sphere(kernel_lifted(_psi2 * (_m == 0)[None], 2), 2, 0), _f2, 0, _rot)),
-        _row("$\\eth$: $\\mathcal{C}_{2\\to3}$", equivariance_error(on_sphere(kernel_multiplier(c_eth(_L, 2), 2, 3), 2, 3), _f2, 3, _rot)),
-        _row("Kaiser–Squires $\\mathcal{C}_{0\\to2}$", equivariance_error(on_sphere(kernel_multiplier(c_kaiser_squires(_L), 0, 2), 0, 2), _f0, 2, _rot)),
-        _row("$E$ from $Q\\pm\\mathrm{i}U$", equivariance_error(lambda _p: (lambda _t, _ph: eval_spin(lifted_conv(kernel_multiplier(-0.5 * np.ones(_L), 2, 0), _p, 2, 0)
-                                                                                        + lifted_conv(kernel_multiplier(-0.5 * np.ones(_L), -2, 0), conj_field_lm(_p, 2), -2, 0), 0, _t, _ph)), _f2, 0, _rot)),
-        _row("directional $\\mathcal{C}_{0\\to G}[\\Lambda_0\\psi]$", equivariance_error_group(lambda _x: lifted_conv(kernel_lifted(_psi, 0), _x, 0, "G"), _f0, _rot)),
-        _row("directional spin $\\mathcal{C}_{2\\to G}[\\Lambda_2\\psi]$", equivariance_error_group(lambda _x: lifted_conv(kernel_lifted(_psi2, 2), _x, 2, "G"), _f2, _rot)),
-        _row("group $\\mathcal{C}_{G\\to G}[\\Psi]$", equivariance_error_group(lambda _x: lifted_conv(_Psi, _x, "G", "G"), _F, _rot, group_input=True)),
+        _row("axisymmetric $(2\\pi)^{-1/2}\\mathcal{C}_{0\\to0}[\\Lambda_0\\psi_{\\text{zonal}}]$", equivariance_error(on_sphere(kernels.lifted(_psi * (_m == 0)[None], 0), 0, 0), _f0, 0, _rot)),
+        _row("left $\\mathcal{C}_{0\\to0}[\\Psi_h]$", equivariance_error(on_sphere(kernels.left(_psi), 0, 0), _f0, 0, _rot)),
+        _row("spin axisymmetric $\\mathcal{C}_{2\\to0}[\\Lambda_2\\Phi]$", equivariance_error(on_sphere(kernels.lifted(_psi2 * (_m == 0)[None], 2), 2, 0), _f2, 0, _rot)),
+        _row("$\\eth$: $\\mathcal{C}_{2\\to3}$", equivariance_error(on_sphere(kernels.multiplier(physics.eth_multiplier(_L, 2), 2, 3), 2, 3), _f2, 3, _rot)),
+        _row("Kaiser–Squires $\\mathcal{C}_{0\\to2}$", equivariance_error(on_sphere(kernels.multiplier(physics.kaiser_squires_multiplier(_L), 0, 2), 0, 2), _f0, 2, _rot)),
+        _row("$E$ from $Q\\pm\\mathrm{i}U$", equivariance_error(lambda _p: (lambda _t, _ph: evaluate(s2conv.lifted_convolution(_p, kernels.multiplier(-0.5 * np.ones(_L), 2, 0), 2, 0)
+                                                                                        + s2conv.lifted_convolution(conjugate(_p, 2), kernels.multiplier(-0.5 * np.ones(_L), -2, 0), -2, 0), 0, _t, _ph)), _f2, 0, _rot)),
+        _row("directional $\\mathcal{C}_{0\\to G}[\\Lambda_0\\psi]$", equivariance_error_group(lambda _x: lifted_convolution_jit(_x, kernels.lifted(_psi, 0), 0, "G"), _f0, _rot)),
+        _row("directional spin $\\mathcal{C}_{2\\to G}[\\Lambda_2\\psi]$", equivariance_error_group(lambda _x: lifted_convolution_jit(_x, kernels.lifted(_psi2, 2), 2, "G"), _f2, _rot)),
+        _row("group $\\mathcal{C}_{G\\to G}[\\Psi]$", equivariance_error_group(lambda _x: lifted_convolution_jit(_x, _Psi, "G", "G"), _F, _rot, group_input=True)),
     ]
     # Haar synthesis has its input on the group: rotate the input by left translation, compare on the sphere.
-    _synthesis = kernel_flip(kernel_lifted(_psi2, 2))
+    _synthesis = kernels.flipped(kernels.lifted(_psi2, 2))
     equivariance_rows += [
-        _row("Haar synthesis $\\mathcal{C}_{G\\to2}[\\widetilde{\\Lambda_2\\psi}]$", equivariance_error(lambda _x: (lambda _t, _p: eval_spin(lifted_conv(_synthesis, _x, "G", 2), 2, _t, _p)), _F, 2, _rot, group_input=True)),
-        _row("standard correlation $E_{\\sigma_0}[\\Lambda_0\\psi]$", equivariance_error(section_map(kernel_lifted(_psi, 0), 0, _L), _f0, 0, _rot), "differ"),
-        _row("standard correlation $E_{\\sigma_0}[\\Lambda_0\\psi]$", equivariance_error(section_map(kernel_lifted(_psi, 0), 0, _L), _f0, 0, _polar), rotation="polar rotation $R_z(1.1)$"),
-        _row("standard correlation, zonal kernel", equivariance_error(section_map(kernel_lifted(_psi * (_m == 0)[None], 0), 0, _L), _f0, 0, _rot)),
-        _row("commutative anisotropic $\\odot_{\\mathrm{S}}$", equivariance_error(section_map(kernel_lifted(conj_field_lm(_psi, 0), 0), 0, _L, chi_sadeghi), _f0, 0, _rot), "differ"),
-        _row("commutative anisotropic $\\odot_{\\mathrm{S}}$", equivariance_error(section_map(kernel_lifted(conj_field_lm(_psi, 0), 0), 0, _L, chi_sadeghi), _f0, 0, _polar), "differ", rotation="polar rotation $R_z(1.1)$"),
-        _row("commutative anisotropic, even orders only", equivariance_error(section_map(kernel_lifted(_even, 0), 0, _L, chi_sadeghi), _f0, 0, _half_turn), rotation="half turn $R_z(\\pi)$"),
-        _row("sifting $\\circledcirc$", equivariance_error(lambda _x: (lambda _t, _p: eval_spin(_x * np.conj(_psi), 0, _t, _p)), _f0, 0, _rot), "differ"),
-        _row("sifting $\\circledcirc$", equivariance_error(lambda _x: (lambda _t, _p: eval_spin(_x * np.conj(_psi), 0, _t, _p)), _f0, 0, _polar), rotation="polar rotation $R_z(1.1)$"),
-        _row("harmonic multiplication, $g_{\\ell m}=g_{\\ell0}$", equivariance_error(lambda _x: (lambda _t, _p: eval_spin(_x * _psi[:, _L - 1 : _L], 0, _t, _p)), _f0, 0, _rot)),
+        _row("Haar synthesis $\\mathcal{C}_{G\\to2}[\\widetilde{\\Lambda_2\\psi}]$", equivariance_error(on_sphere(_synthesis, "G", 2), _F, 2, _rot, group_input=True)),
+        _row("standard correlation $E_{\\sigma_0}[\\Lambda_0\\psi]$", equivariance_error(section_map(kernels.lifted(_psi, 0), 0, _L), _f0, 0, _rot), "differ"),
+        _row("standard correlation $E_{\\sigma_0}[\\Lambda_0\\psi]$", equivariance_error(section_map(kernels.lifted(_psi, 0), 0, _L), _f0, 0, _polar), rotation="polar rotation $R_z(1.1)$"),
+        _row("standard correlation, zonal kernel", equivariance_error(section_map(kernels.lifted(_psi * (_m == 0)[None], 0), 0, _L), _f0, 0, _rot)),
+        _row("commutative anisotropic $\\odot_{\\mathrm{S}}$", equivariance_error(section_map(kernels.lifted(conjugate(_psi, 0), 0), 0, _L, chi_sadeghi), _f0, 0, _rot), "differ"),
+        _row("commutative anisotropic $\\odot_{\\mathrm{S}}$", equivariance_error(section_map(kernels.lifted(conjugate(_psi, 0), 0), 0, _L, chi_sadeghi), _f0, 0, _polar), "differ", rotation="polar rotation $R_z(1.1)$"),
+        _row("commutative anisotropic, even orders only", equivariance_error(section_map(kernels.lifted(_even, 0), 0, _L, chi_sadeghi), _f0, 0, _half_turn), rotation="half turn $R_z(\\pi)$"),
+        _row("sifting $\\circledcirc$", equivariance_error(lambda _x: (lambda _t, _p: evaluate(diagonal.sifting_convolution(_x, _psi), 0, _t, _p)), _f0, 0, _rot), "differ"),
+        _row("sifting $\\circledcirc$", equivariance_error(lambda _x: (lambda _t, _p: evaluate(diagonal.sifting_convolution(_x, _psi), 0, _t, _p)), _f0, 0, _polar), rotation="polar rotation $R_z(1.1)$"),
+        _row("harmonic multiplication, $g_{\\ell m}=g_{\\ell0}$", equivariance_error(lambda _x: (lambda _t, _p: evaluate(diagonal.harmonic_multiplication(_x, _g_zonal), 0, _t, _p)), _f0, 0, _rot)),
     ]
     check_table(equivariance_rows, first="Operator")
     return (equivariance_rows,)
@@ -1872,17 +1607,17 @@ def _(L, N_DIR, eq_op_ui, f_bars, ridge_lm):
     _rot = (0.5, 1.1, -0.4)
     _choice = eq_op_ui.value
     if _choice.startswith("spin"):
-        _apply, _sp = on_sphere(kernel_multiplier(c_kaiser_squires(L), 0, 2), 0, 2), 2
+        _apply, _sp = on_sphere(kernels.multiplier(physics.kaiser_squires_multiplier(L), 0, 2), 0, 2), 2
     elif _choice == "standard correlation":
-        _apply, _sp = section_map(kernel_lifted(ridge_lm, 0), 0, N_DIR), 0
+        _apply, _sp = section_map(kernels.lifted(ridge_lm, 0), 0, N_DIR), 0
     elif _choice == "commutative anisotropic":
-        _apply, _sp = section_map(kernel_lifted(conj_field_lm(ridge_lm, 0), 0), 0, N_DIR, chi_sadeghi), 0
+        _apply, _sp = section_map(kernels.lifted(conjugate(ridge_lm, 0), 0), 0, N_DIR, chi_sadeghi), 0
     else:
-        _apply, _sp = (lambda _x: (lambda _t, _p: eval_spin(_x * np.conj(ridge_lm), 0, _t, _p))), 0
-    _th, _ph = sphere_grid(64)
+        _apply, _sp = (lambda _x: (lambda _t, _p: evaluate(diagonal.sifting_convolution(_x, ridge_lm), 0, _t, _p))), 0
+    _th, _ph = transforms.sphere_angles(64)
     _T, _P = np.meshgrid(_th, _ph, indexing="ij")
-    _lhs = _apply(rotate_flm(f_bars, wigner_D(*_rot, L)))(_T, _P)
-    _a, _b, _c = euler_zyz(rot_matrix(*_rot).T @ section(_T, _P))
+    _lhs = _apply(rotate_flm(f_bars, _rot))(_T, _P)
+    _a, _b, _c = euler_angles(rotation_matrix(*_rot).T @ section(_T, _P))
     _rhs = np.exp(-1j * _sp * _c) * _apply(f_bars)(_b, _a)
     _vmax = np.max(np.abs(_rhs.real))
     _fig = Figure(figsize=(13, 3.3), layout="constrained")
@@ -1958,18 +1693,18 @@ def _(timing_ui):
     _names = ["$\\mathcal{C}_{2\\to1}$", "$\\mathcal{C}_{2\\to G}$, $N=3$", f"$\\mathcal{{C}}_{{2\\to G}}$, $N={_N}$", f"$\\mathcal{{C}}_{{G\\to G}}$, $N={_N}$"]
     _times = {_name: [] for _name in _names}
     for _Lt in _Ls:
-        _f = isht(generate_flm(_rng, _Lt, spin=2), _Lt, 2)
+        _f = transforms.inverse(generate_flm(_rng, _Lt, spin=2), _Lt, 2)
         _c = np.ones(_Lt)
         _psi = generate_flm(_rng, _Lt, spin=2)
         _psi3 = _psi * (np.abs(m_axis(_Lt)) < 3)[None]
         _psiN = _psi * (np.abs(m_axis(_Lt)) < _N)[None]
         _K = random_kernel(_Lt, _rng, _N)
-        _F = wigner_inv(generate_flmn(_rng, _Lt, _N), _Lt, _N)
+        _F = transforms.wigner_inverse(generate_flmn(_rng, _Lt, _N), _Lt, _N)
         _jobs = {
-            _names[0]: lambda: isht(lifted_conv(kernel_multiplier(_c, 2, 1), sht(_f, _Lt, 2), 2, 1), _Lt, 1),
-            _names[1]: lambda: wigner_inv(lifted_conv(kernel_lifted(_psi3, 2), sht(_f, _Lt, 2), 2, "G", N_out=3), _Lt, 3),
-            _names[2]: lambda: wigner_inv(lifted_conv(kernel_lifted(_psiN, 2), sht(_f, _Lt, 2), 2, "G", N_out=_N), _Lt, _N),
-            _names[3]: lambda: wigner_inv(lifted_conv(_K, wigner_fwd(_F, _Lt, _N), "G", "G", N_out=_N), _Lt, _N),
+            _names[0]: lambda: transforms.inverse(s2conv.lifted_convolution(transforms.forward(_f, _Lt, 2), kernels.multiplier(_c, 2, 1), 2, 1), _Lt, 1),
+            _names[1]: lambda: transforms.wigner_inverse(s2conv.lifted_convolution(transforms.forward(_f, _Lt, 2), kernels.lifted(_psi3, 2), 2, "G", N_out=3), _Lt, 3),
+            _names[2]: lambda: transforms.wigner_inverse(s2conv.lifted_convolution(transforms.forward(_f, _Lt, 2), kernels.lifted(_psiN, 2), 2, "G", N_out=_N), _Lt, _N),
+            _names[3]: lambda: transforms.wigner_inverse(s2conv.lifted_convolution(transforms.wigner_forward(_F, _Lt, _N), _K, "G", "G", N_out=_N), _Lt, _N),
         }
         for _name, _job in _jobs.items():
             _job()

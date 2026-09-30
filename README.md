@@ -121,9 +121,10 @@ Harmonic-space operators (`s2conv.lifted`, `s2conv.classical`, `s2conv.physics`,
 
 ## Notebook 📓
 
-The Marimo notebook [`notebooks/lifted_convolutions.py`](https://github.com/astro-informatics/s2conv/blob/main/notebooks/lifted_convolutions.py) demonstrates each convolution and checks it numerically against the closed forms of the article, a literal evaluation on a sampling of the rotation group and the real-space definitions.  Run it with
+The Marimo notebook [`notebooks/lifted_convolutions.py`](https://github.com/astro-informatics/s2conv/blob/main/notebooks/lifted_convolutions.py) demonstrates each convolution with `S2CONV` and checks it numerically against the closed forms of the article, a literal evaluation on a sampling of the rotation group and the real-space definitions.  Install the package with the notebook extras and run it with
 
 ```bash
+pip install ".[notebooks]"
 marimo edit notebooks/lifted_convolutions.py
 ```
 
