@@ -23,6 +23,8 @@ with app.setup:
     jax.config.update("jax_enable_x64", True)  # must precede the import of s2fft and s2conv
 
     import marimo as mo
+    import matplotlib
+    import matplotlib.ticker
     import numpy as np
     import s2conv
     from matplotlib.collections import LineCollection
@@ -38,6 +40,7 @@ with app.setup:
     GAMMA = 9.798  # mean normal gravity on the Earth's surface (m s^-2)
     R_CORE = 3.485e6  # radius of the core-mantle boundary (m)
     ARCSEC = 180 * 3600 / np.pi  # arcseconds per radian
+    matplotlib.rcParams["figure.dpi"] = 72  # marimo renders at twice this: keeps the largest figures within its output limit
 
 
 @app.cell(hide_code=True)
@@ -45,23 +48,27 @@ def _():
     mo.md(r"""
     # Lifted convolutions of real spin fields
 
-    This notebook applies the **generalised lifted spherical convolution** of the article *Unifying spherical convolutions through lifting*, as implemented in [`s2conv`](https://github.com/astro-informatics/s2conv), to fields measured on the Earth and on the sky.  The companion notebook `lifted_convolutions.py` verifies the operators; this one shows what they are for.
+    This notebook accompanies the article *Unifying spherical convolutions through lifting* (J. D. McEwen, 2026, forthcoming) and the companion notebook `lifted_convolutions.py`, which verifies numerically the operators of the article as implemented in [`s2conv`](https://github.com/astro-informatics/s2conv).  Here we apply the generalised lifted spherical convolution to fields measured on the Earth and on the sky, in order to illustrate what the construction affords in practice: operators that map between fields of different spin exactly and efficiently, and that respect the geometry of each field.
 
-    **Spin fields.**  Many of the fields of geophysics and cosmology are not scalars.  A wind, an ocean current, a deflection of the vertical or a horizontal magnetic field is a tangent vector; the polarisation of the cosmic microwave background (CMB), the shear of weak gravitational lensing and the horizontal gravity-gradient tensor are symmetric trace-free tensors, i.e. headless directions.  Their components are defined only relative to a local frame $(e_\theta,e_\varphi)$, which turns from point to point and is undefined at the poles.  Written in that frame, a field whose components change by $e^{\mathrm{i}s\chi}$ when the frame turns by $\chi$ is a spin-$s$ field: ${}_1f=v_\theta+\mathrm{i}v_\varphi$ for a vector, ${}_2f=Q+\mathrm{i}U$ for a headless direction.  Treating the components as independent scalar fields, i.e. smoothing or filtering $v_\theta$ and $v_\varphi$ (or $Q$ and $U$) separately, mixes values expressed in different frames: the result depends on where the poles of the coordinates are, it is not rotation-equivariant, and it is wrong near the poles.
+    **Spin fields.**  Many of the fields of geophysics and cosmology are not scalars.  A wind, an ocean current, the deflection of the vertical and the horizontal magnetic field are tangent vectors, while the polarisation of the cosmic microwave background, the shear of weak gravitational lensing and the horizontal part of the gravity-gradient tensor describe a headless direction at each point.  The components of such a field are defined only with respect to a local frame $(e_\theta,e_\varphi)$, in which $e_\theta$ points south and $e_\varphi$ east, and which turns from point to point and is undefined at the poles of the coordinates.  A field whose components are multiplied by $e^{\mathrm{i}s\chi}$ when the frame turns by $\chi$ is a spin-$s$ field, so that a vector with components $(v_\theta,v_\varphi)$ is the spin-1 field ${}_1f=v_\theta+\mathrm{i}v_\varphi$ and a polarisation with Stokes parameters $(Q,U)$ is the spin-2 field ${}_2f=Q+\mathrm{i}U$.  Treating the components as independent scalar fields, for example by smoothing $v_\theta$ and $v_\varphi$, or $Q$ and $U$, separately, combines values expressed in different frames, and the result then depends on the choice of coordinates and is incorrect near their poles.
 
-    **Lifted convolutions.**  A spin-$s$ field is lifted to the rotation group, convolved there with a kernel $\Psi$ and projected back to spin $s'$, $\mathcal{C}_{s\to s'}[\Psi]=\Lambda_{s'}^\dagger(\Psi\star\Lambda_s\,\cdot\,)$.  In harmonic space it multiplies each coefficient ${}_sf_{\ell m}$ by a single Wigner coefficient of the kernel, so that every bounded rotation-equivariant linear map between spin fields is of this form.  Each example below uses the lifted convolution with the input and output spins that the physics dictates:
+    **Lifted convolutions.**  A spin-$s$ field is lifted to the rotation group, convolved there with a kernel $\Psi$ and projected back to the sphere with spin $s'$, $\mathcal{C}_{s\to s'}[\Psi]=\Lambda_{s'}^\dagger(\Psi\star\Lambda_s\,\cdot\,)$.  In harmonic space the operator multiplies each coefficient ${}_sf_{\ell m}$ by a single Wigner coefficient of the kernel, and every bounded rotation-equivariant linear map between spin fields is of this form.  In each of the examples we adopt the lifted convolutions whose input and output spins are those of the physical quantities involved, as summarised in the following table.
 
     | Field | Spin | Lifted convolutions |
     |:--|:-:|:--|
-    | Earth's topography | 0 | slope $\mathcal{C}_{0\to1}$, ridges and their orientation $\mathcal{C}_{0\to s'}$, $\lvert s'\rvert<5$ |
-    | Earth's gravity field (geoid) | 0 | gravity anomaly $\mathcal{C}_{0\to0}$, deflection of the vertical $\mathcal{C}_{0\to1}$, gravity gradients $\mathcal{C}_{0\to2}$, and their inverses |
-    | Earth's magnetic field | 0, 1 | radial and horizontal field $\mathcal{C}_{0\to0}$, $\mathcal{C}_{0\to1}$; continuation to the core $\mathcal{C}_{0\to0}$, $\mathcal{C}_{1\to1}$ |
-    | Near-surface wind | 1 | vorticity and divergence $\mathcal{C}_{1\to0}$, Helmholtz decomposition $\mathcal{C}_{0\to1}$, smoothing $\mathcal{C}_{1\to1}$ |
+    | Topography | 0 | slope $\mathcal{C}_{0\to1}$; ridges and their orientation $\mathcal{C}_{0\to s'}$, $\lvert s'\rvert<5$ |
+    | Gravity (geoid) | 0 | gravity anomaly $\mathcal{C}_{0\to0}$; deflection of the vertical $\mathcal{C}_{0\to1}$; gravity gradients $\mathcal{C}_{0\to2}$; their inverses |
+    | Geomagnetic field | 0, 1 | radial and horizontal field $\mathcal{C}_{0\to0}$, $\mathcal{C}_{0\to1}$; continuation to the core $\mathcal{C}_{0\to0}$, $\mathcal{C}_{1\to1}$ |
+    | Near-surface wind | 1 | vorticity and divergence $\mathcal{C}_{1\to0}$; Helmholtz decomposition $\mathcal{C}_{0\to1}$; smoothing $\mathcal{C}_{1\to1}$ |
     | Ocean surface currents | 1 | stream function and upwelling $\mathcal{C}_{1\to0}$ |
-    | CMB polarisation | 2 | $E$/$B$ decomposition $\mathcal{C}_{\pm2\to0}$, pure-mode polarisation $\mathcal{C}_{0\to2}$, smoothing $\mathcal{C}_{2\to2}$ |
+    | CMB polarisation | 2 | $E$ and $B$ modes $\mathcal{C}_{\pm2\to0}$; polarisation of each mode $\mathcal{C}_{0\to2}$; smoothing $\mathcal{C}_{2\to2}$ |
     | Weak-lensing shear | 2 | mass mapping (Kaiser–Squires) $\mathcal{C}_{2\to0}$ |
 
-    Two examples (the wind and the CMB polarisation) compare the spin-$s$ smoothing $\mathcal{C}_{s\to s}$ with the smoothing of the components as scalars, to show what the spin formalism avoids.  The fields are stored as harmonic coefficients in `notebooks/data` (`notebooks/data/README.md` gives their sources and licences and how they are made) and truncated to the band-limit $L$ below; the Earth fields are tapered by $e^{-\ell(\ell+1)/L^2}$, which falls to $0.37$ at $\ell=L$ and keeps the ringing of the truncation at coastlines and jets small.  Coastlines are those of Natural Earth.
+    For the wind and for the polarisation of the CMB we also compare the spin-preserving smoothing $\mathcal{C}_{s\to s}$ with the smoothing of the components as if they were scalar fields, which shows the errors that the spin formalism avoids.
+
+    **Data.**  The fields are stored as harmonic coefficients in `notebooks/data`, whose README gives their sources, licences and preparation, and are truncated to the band-limit $L$ set below.  The fields of the Earth are multiplied by the taper $e^{-\ell(\ell+1)/L^2}$, which falls to $0.37$ at $\ell=L$ and limits the ringing of the truncation at coastlines and jets.
+
+    **Reading the figures.**  Maps of the whole sphere use the Mollweide projection, centred on the meridian of longitude zero with north at the top; the fields of the Earth are in geographic coordinates and the Planck maps in Galactic coordinates.  Views of one hemisphere use the orthographic projection, centred on the point given in each caption, with local north at the top.  A signed quantity is shown as colour on a diverging scale, red for positive and blue for negative values and white for zero, symmetric about zero; a non-negative quantity, such as the modulus of a spin field, is shown on a sequential scale from light to dark.  A colour bar beneath each panel gives the quantity or its units.  Spin fields are drawn in the tangent plane with the glyphs of Fig. 1 of the article: a spin-1 field ${}_1f$ as an arrow pointing along the vector, at the angle $\arg({}_1f)$ from $e_\theta$ towards $e_\varphi$, and a spin-2 field ${}_2f$ as a headless stick at the angle $\arg({}_2f)/2$, which a half turn leaves unchanged.  The glyphs are placed at quasi-uniform (Fibonacci) points, and their lengths grow linearly with the modulus of the field, from the fraction of the largest length stated in each caption up to the largest length at the largest modulus.  The colour and the glyphs of a panel may show different fields, as each caption states.  Coastlines, from Natural Earth, are drawn as black lines.
     """)
     return
 
@@ -239,9 +246,20 @@ def angles_of(v):
 
 
 @app.function
-def mollweide_grid(ax, data, thetas, phis, cmap="RdBu_r", vmax=None, symmetric=True, title=None, coast=False, contours=None):
-    """Draw MW samples data[t, p] on a Mollweide axis, with longitude 0 at the centre, optionally with the coastlines
-    and contour lines at the given levels."""
+def colour_bar(ax, image, label):
+    """A horizontal colour bar beneath a panel, labelled with the quantity or its units."""
+    bar = ax.figure.colorbar(image, ax=ax, orientation="horizontal", shrink=0.7, aspect=30, pad=0.03)
+    bar.set_label(label, fontsize=8)
+    bar.locator = matplotlib.ticker.MaxNLocator(nbins=6, symmetric=bool(image.norm.vmin < 0))
+    bar.update_ticks()
+    bar.ax.tick_params(labelsize=7)
+
+
+@app.function
+def mollweide_grid(ax, data, thetas, phis, cmap="RdBu_r", vmax=None, symmetric=True, title=None, coast=False, contours=None,
+                   label=None):
+    """Draw MW samples data[t, p] on a Mollweide axis, with longitude 0 at the centre, optionally with the coastlines,
+    contour lines at the given levels and a colour bar with the given label."""
     lon = np.mod(phis + np.pi, 2 * np.pi) - np.pi
     order = np.argsort(lon)
     lon = np.append(lon[order], np.pi)
@@ -261,16 +279,18 @@ def mollweide_grid(ax, data, thetas, phis, cmap="RdBu_r", vmax=None, symmetric=T
     ax.grid(False)
     if title:
         ax.set_title(title, fontsize=9)
+    if label:
+        colour_bar(ax, image, label)
     return image
 
 
 @app.function
-def mollweide(ax, flm, s=0, part="real", cmap=None, L_plot=128, vmax=None, title=None, coast=False, contours=None):
+def mollweide(ax, flm, s=0, part="real", cmap=None, L_plot=128, vmax=None, title=None, coast=False, contours=None, label=None):
     """Mollweide map of the real part, imaginary part or modulus of a band-limited spin field."""
     f, (th, ph) = field_grid(flm, s, L_plot)
     data = {"real": f.real, "imag": f.imag, "abs": np.abs(f)}[part]
     symmetric = part != "abs"
-    return mollweide_grid(ax, data, th, ph, cmap or ("RdBu_r" if symmetric else "YlGnBu"), vmax, symmetric, title, coast, contours)
+    return mollweide_grid(ax, data, th, ph, cmap or ("RdBu_r" if symmetric else "YlGnBu"), vmax, symmetric, title, coast, contours, label)
 
 
 @app.function
@@ -301,11 +321,11 @@ def mollweide_glyphs(ax, flm, s, n_glyph=700, size=0.022, color="k", lat_max=np.
 @app.function
 def orthographic(ax, flm, s=0, part="real", cmap=None, lat0=0.35, lon0=0.6, glyph_flm=None, glyph_s=None,
                  n_glyph=420, glyph_len=0.07, glyph_color="k", vmax=None, title=None, L_plot=128, npix=260, coast=False,
-                 symmetric=None, glyph_floor=0.35):
+                 symmetric=None, glyph_floor=0.35, label=None):
     """One hemisphere in orthographic projection, centred on (lat0, lon0) in radians.  Colour shows the field; for spin
     fields, glyphs with |s|-fold symmetry show the value in the local frame (e_theta, e_phi): an arrow for spin 1 and a
     headless stick for spin 2, at the angle arg(f)/s from e_theta towards e_phi.  The glyphs may be taken from another
-    field (glyph_flm, glyph_s).  With coast, the coastlines are drawn."""
+    field (glyph_flm, glyph_s).  With coast, the coastlines are drawn, and with label a colour bar."""
     out = unit_vector(np.pi / 2 - lat0, lon0)
     east = np.array([-np.sin(lon0), np.cos(lon0), 0.0])
     V = np.stack([east, np.cross(out, east), out], axis=1)  # screen right, screen up, towards the viewer
@@ -363,21 +383,21 @@ def orthographic(ax, flm, s=0, part="real", cmap=None, lat0=0.35, lon0=0.6, glyp
     ax.axis("off")
     if title:
         ax.set_title(title, fontsize=9)
+    if label:
+        colour_bar(ax, image, label)
     return image
 
 
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## 1. The Earth's topography: slopes and ridges (spin 0 → 1 → 2)
+    ## 1. Topography: slopes and ridges (spin 0 → 1 → 2)
 
-    The topography and bathymetry $f$ (ETOPO 2022, NOAA) is a scalar field, but the two quantities that describe its shape are not.
+    The elevation of the land and the depth of the ocean floor, the topography and bathymetry $f$ of ETOPO 2022 (NOAA National Centers for Environmental Information), form a scalar field, but the two quantities that describe the shape of the relief are not scalars: the slope is a vector, and the orientation of a mountain range is a headless direction.
 
-    **Slope.**  The gradient is a vector, and the lifted convolution $\mathcal{C}_{0\to1}$ with the multiplier $\sqrt{\ell(\ell+1)}$ of the spin raising operator gives it directly as a spin-1 field: since $\eth f=-(\partial_\theta+\mathrm{i}\sin^{-1}\theta\,\partial_\varphi)f$, the field $\eth f/R_\oplus$ is the vector $-\nabla f$, pointing downhill, with the slope as its modulus.  The arrows show where water would flow.
+    We obtain the slope by the lifted convolution $\mathcal{C}_{0\to1}$ whose kernel is the multiplier $\sqrt{\ell(\ell+1)}$ of the spin raising operator.  Since $\eth f=-(\partial_\theta+\mathrm{i}\sin^{-1}\theta\,\partial_\varphi)f$ for a scalar field, the spin-1 field $\eth f/R_\oplus$, where $R_\oplus$ is the radius of the Earth, is the vector $-\nabla f$, which points downhill and whose length is the slope, and which therefore indicates the direction in which water flows.
 
-    **Ridges.**  A mountain range has an orientation, a headless direction.  The steerable ridge detector $\psi$ (an elongated second-derivative profile with azimuthal orders $|m|<5$) is applied at every orientation $\gamma$ at once by the directional convolution $f\circledast\psi$, a function on the rotation group.  Since the kernel is steerable, this function is the tuple of the nine spin fields ${}_{s'}g=\mathcal{C}_{0\to s'}[\Lambda_0\psi]f$, $|s'|<5$ (Proposition VI.6), from which the response at any $\gamma$ follows as $\sum_{s'}(2\pi)^{-1/2}e^{-\mathrm{i}s'\gamma}\,{}_{s'}g$.  Its largest value over $\gamma$ is the ridge strength, and the spin-2 component ${}_2g$ is the orientation of the ridges as a spin-2 field: it is largest along a ridge at the angle $\arg({}_2g)/2$, drawn as sticks.  No sampling of orientations is needed, and both outputs are exactly rotation-equivariant, so that ranges running north–south and east–west, near the equator or near the poles, are detected alike.  The detector is applied to the land elevation $f_+=\max(f,0)$, since the continental margins, a step of several kilometres, would otherwise dominate its response.
-
-    The figure shows the topography, the slope of the land with the downhill direction, and the ridge strength, and zooms onto the Himalaya and the Andes with the downhill arrows and the ridge orientation.
+    To locate mountain ranges we consider a steerable ridge detector $\psi$, a kernel elongated along one direction with a zero-mean profile across it, like a second derivative, and with azimuthal orders $|m|<5$.  Its directional convolution with the field, $f\circledast\psi$, is a function on the rotation group that gives the response of the detector at every position and every orientation $\gamma$.  Since the kernel is steerable, this function is the tuple of the nine spin fields ${}_{s'}g=\mathcal{C}_{0\to s'}[\Lambda_0\psi]f$, $|s'|<5$ (Proposition VI.6 of the article), from which the response at any orientation follows as $\sum_{s'}(2\pi)^{-1/2}e^{-\mathrm{i}s'\gamma}\,{}_{s'}g$.  The largest response over $\gamma$ measures the strength of a ridge, and the spin-2 component ${}_2g$, the part of the response that varies with orientation as $\cos2\gamma$ like that of a line, is itself the orientation of the ridges as a spin-2 field: the response is largest when the detector lies at the angle $\arg({}_2g)/2$, along the ridge.  No sampling of orientations is required, and since both outputs are rotation-equivariant, ranges are detected alike whatever their orientation and position, near the equator or near the poles.  We apply the detector to the land elevation $f_+=\max(f,0)$, since the continental margins, a step of several kilometres, would otherwise dominate its response.
     """)
     return
 
@@ -385,10 +405,9 @@ def _():
 @app.cell
 def _(L):
     _topo, _ = example_field("earth_topography", L)
-    _downhill = physics.eth(_topo, 0) / (R_EARTH / 1e3) * 1e3  # C_{0->1}: -grad f, as a slope in m per km
     _grid, _ = field_grid(_topo, 0, 2 * L)  # clip at sea level on a finer grid, to keep the aliasing small
     _land = np.asarray(transforms.forward(np.maximum(_grid.real, 0), 2 * L))[:L, L : 3 * L - 1]
-    _land_downhill = physics.eth(_land, 0) / (R_EARTH / 1e3) * 1e3
+    _downhill = physics.eth(_land, 0) / (R_EARTH / 1e3) * 1e3  # C_{0->1}: -grad f_+, as a slope in m per km
     _N = 5
     _ridge = oriented_kernel(L, sig_long=2.5 * 2.6 / L, sig_short=2.6 / L, N=_N, ridge=True)
     _comps = {_q: s2conv.lifted_convolution(_land, kernels.lifted(_ridge, 0), 0, _q) for _q in range(-(_N - 1), _N)}
@@ -397,37 +416,34 @@ def _(L):
                         for _g in np.linspace(0, np.pi, 36, endpoint=False)], axis=0) / np.sqrt(2 * np.pi)
     _th, _ph = transforms.sphere_angles(128)
 
-    _fig = Figure(figsize=(13, 7.4), layout="constrained")
-    mollweide(_fig.add_subplot(2, 3, 1, projection="mollweide"), _topo, cmap="BrBG_r", coast=True, title="topography and bathymetry $f$ (km)")
+    _fig = Figure(figsize=(13, 8.4), layout="constrained")
+    mollweide(_fig.add_subplot(2, 3, 1, projection="mollweide"), _topo, cmap="BrBG_r", coast=True, title="(a) topography and bathymetry $f$", label="km")
     _ax = _fig.add_subplot(2, 3, 2, projection="mollweide")
-    mollweide(_ax, _land_downhill, 1, part="abs", cmap="YlOrBr", coast=True, title="slope of the land $|\\eth f_+|/R_\\oplus$ (m/km), downhill arrows")
-    mollweide_glyphs(_ax, _land_downhill, 1, n_glyph=900, size=0.022, floor=0.0)
+    mollweide(_ax, _downhill, 1, part="abs", cmap="YlOrBr", coast=True, title="(b) slope of the land and downhill direction $\\eth f_+$", label="m/km")
+    mollweide_glyphs(_ax, _downhill, 1, n_glyph=900, size=0.022, floor=0.0)
     mollweide_grid(_fig.add_subplot(2, 3, 3, projection="mollweide"), np.clip(_strength, 0, None), _th, _ph, cmap="YlOrBr", symmetric=False, coast=True,
-                   title="ridge strength $\\max_\\gamma(f_+\\circledast\\psi)(\\cdot,\\gamma)$")
+                   title="(c) ridge strength $\\max_\\gamma(f_+\\circledast\\psi)(\\cdot,\\gamma)$", label="arbitrary units")
     _view = dict(lat0=np.radians(32), lon0=np.radians(85))
-    orthographic(_fig.add_subplot(2, 3, 4), _land, 0, cmap="YlOrBr", symmetric=False, **_view, glyph_flm=_land_downhill, glyph_s=1, coast=True, glyph_floor=0.0,
-                 title="Himalaya and Tibet: land elevation, downhill $\\eth f_+$")
+    orthographic(_fig.add_subplot(2, 3, 4), _land, 0, cmap="YlOrBr", symmetric=False, **_view, glyph_flm=_downhill, glyph_s=1, coast=True, glyph_floor=0.0,
+                 title="(d) Himalaya: land elevation $f_+$ and $\\eth f_+$", label="km")
     orthographic(_fig.add_subplot(2, 3, 5), _comps[2], 2, part="abs", cmap="YlOrBr", **_view, coast=True, glyph_floor=0.1,
-                 title="ridge orientation ${}_2g=\\mathcal{C}_{0\\to2}[\\Lambda_0\\psi]f_+$")
+                 title="(e) Himalaya: ridge orientation ${}_2g$", label="arbitrary units")
     orthographic(_fig.add_subplot(2, 3, 6), _comps[2], 2, part="abs", cmap="YlOrBr", lat0=np.radians(-20), lon0=np.radians(-68), coast=True, glyph_floor=0.1,
-                 title="Andes: ridge orientation ${}_2g$")
-    _fig.suptitle("Topography: a scalar field whose slope is spin 1 and whose ridge orientation is spin 2", fontsize=10)
-    _fig
+                 title="(f) Andes: ridge orientation ${}_2g$", label="arbitrary units")
+    mo.vstack([mo.as_html(_fig), mo.md(r"""
+    **Figure 1.** The topography of the Earth, its slope and its ridges, from lifted convolutions of spin 0 to spin 1 and to spin 2.  Top, from left to right: (a) the topography and bathymetry $f$, shown as colour in km on a diverging scale, brown above and green below sea level; (b) the slope of the land $|\eth f_+|/R_\oplus$, shown as colour in metres per kilometre, with the spin-1 field $\eth f_+$ drawn as arrows pointing downhill, whose lengths are proportional to the slope; (c) the ridge strength $\max_\gamma(f_+\circledast\psi)(\cdot,\gamma)$, the largest response of the ridge detector over all orientations, shown as colour on a sequential scale in arbitrary units.  Bottom: orthographic views of (d) the Himalaya and the Tibetan Plateau, centred on 32°N, 85°E, with the land elevation $f_+$ shown as colour in km and the downhill arrows of (b); (e) the same view, with the modulus of the ridge orientation field $|{}_2g|$ shown as colour and ${}_2g$ drawn as headless sticks at the angle $\arg({}_2g)/2$, whose lengths grow in proportion to $|{}_2g|$ from a tenth of the largest length; and (f) the same for the Andes, centred on 20°S, 68°W.  The arrows run down the flanks of the plateau, the ridge strength picks out the Himalaya, the Andes, the Rocky Mountains, the highlands of East Africa and the ice sheets of Greenland and Antarctica, and where the ridge strength is large the sticks lie along the ranges, from east to west along the Himalaya and from north to south along the Andes.
+    """)])
     return
 
 
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## 2. The Earth's gravity field: one potential, three spins (spin 0 → 0, 1, 2 and back)
+    ## 2. Gravity: one potential and its derivatives of spin 0, 1 and 2
 
-    The geoid height $N$ of the Earth Gravitational Model EGM2008 (Pavlis *et al.* 2012), the height of the equipotential surface of gravity above the reference ellipsoid, is a scalar field.  By Bruns' formula it is the disturbing potential $T=\gamma N$ divided by normal gravity, and the quantities that geodesy measures are derivatives of $T$ of increasing spin:
+    The geoid is the surface of constant gravity potential that coincides with mean sea level over the oceans, and its height $N$ above the reference ellipsoid is a scalar field, which we take from the Earth Gravitational Model EGM2008 (Pavlis *et al.* 2012).  By Bruns' formula $N$ is the disturbing potential $T$, the difference between the gravity potential of the Earth and that of the ellipsoid, divided by the normal gravity $\gamma$, and the quantities that geodesy measures are derivatives of $T$ of increasing spin.  The gravity anomaly, measured by gravimeters, is the scalar field with coefficients $\Delta g_{\ell m}=\frac{\gamma}{R_\oplus}(\ell-1)N_{\ell m}$ in the spherical approximation, i.e. the lifted convolution $\mathcal{C}_{0\to0}$ with the multiplier $\frac{\gamma}{R_\oplus}(\ell-1)$.  The deflection of the vertical, the angle between the direction of gravity, i.e. the plumb line, and the normal to the ellipsoid, is measured by astronomical positioning and is the vector $-\nabla N/R_\oplus$, i.e. the spin-1 field $\varepsilon=\eth N/R_\oplus$ given by $\mathcal{C}_{0\to1}$ with the multiplier $\sqrt{\ell(\ell+1)}/R_\oplus$.  The horizontal, trace-free part of the tensor of second derivatives of $T$, measured by the gradiometer of the GOCE satellite, is the spin-2 field $\Gamma=\tfrac12\eth^2T/R_\oplus^2$ given by $\mathcal{C}_{0\to2}$.
 
-    * the **gravity anomaly** $\Delta g_{\ell m}=\frac{\gamma}{R}(\ell-1)N_{\ell m}$, measured by gravimeters, is a scalar, $\mathcal{C}_{0\to0}$;
-    * the **deflection of the vertical**, the angle between the plumb line and the normal to the ellipsoid, is the vector $-\nabla N/R$, the spin-1 field $\varepsilon=\eth N/R=\mathcal{C}_{0\to1}[\sqrt{\ell(\ell+1)}/R]\,N$, measured by astronomical positioning;
-    * the horizontal, trace-free part of the **gravity-gradient tensor**, measured by the gradiometer of the GOCE satellite, is the spin-2 field $\Gamma=\tfrac12\eth^2T/R^2=\mathcal{C}_{0\to2}$.
-
-    The classical integral formulas of physical geodesy are lifted convolutions between these spins.  The Vening Meinesz formula, which gives the deflection of the vertical from gravity anomalies, is the spin-changing convolution $\mathcal{C}_{0\to1}$ with the multiplier $\frac{\sqrt{\ell(\ell+1)}}{\gamma(\ell-1)}$; its inverse, and the recovery of the geoid from deflections (astrogeodetic levelling, $\mathcal{C}_{1\to0}$) or from gradients ($\mathcal{C}_{2\to0}$), are single multipliers too.  The recovery of the potential from its spin-2 gradients is the same operator as the Kaiser–Squires mass mapping of weak lensing in Sec. 7, since the shear is likewise $\tfrac12\eth^2$ of the lensing potential.  The titles report the relative errors of these conversions, which hold to machine precision because each is a single multiplier.
+    The classical integral formulae of physical geodesy are lifted convolutions between these spins.  The formula of Vening Meinesz, which gives the deflection of the vertical from gravity anomalies, is the spin-changing convolution $\mathcal{C}_{0\to1}$ with the multiplier $\sqrt{\ell(\ell+1)}/(\gamma(\ell-1))$.  The recovery of the geoid from deflections of the vertical, known as astrogeodetic levelling, is the lifted convolution $\mathcal{C}_{1\to0}$ that inverts $\mathcal{C}_{0\to1}$, and the recovery of the geoid from its gradients is the lifted convolution $\mathcal{C}_{2\to0}$ that inverts $\tfrac12\eth^2$, the operator that also underlies the Kaiser–Squires relation between the shear and the convergence of weak lensing.  Each of these relations is a single multiplier in harmonic space and holds to machine precision for band-limited fields, as the relative errors reported in the caption of Fig. 2 confirm.
     """)
     return
 
@@ -435,42 +451,42 @@ def _():
 @app.cell
 def _(L):
     _N, _ = example_field("geoid", L)
-    _el = np.arange(L)
     _dg = apply(_N, multiplier(L, lambda el: GAMMA / R_EARTH * (el - 1) * 1e5), 0, 0)  # C_{0->0}: gravity anomaly (mGal)
     _eps = physics.eth(_N, 0) / R_EARTH * ARCSEC  # C_{0->1}: deflection of the vertical (arcsec)
     _vm = multiplier(L, lambda el: np.where(el > 1, np.sqrt(el * (el + 1)) / np.maximum(el - 1, 1) / (GAMMA * 1e5) * ARCSEC, 0))
     _eps_vm = apply(_dg, _vm, 0, 1)  # Vening Meinesz: C_{0->1} from gravity anomalies
     _grad = physics.eth(physics.eth(_N, 0), 1) * GAMMA / (2 * R_EARTH**2) * 1e9  # C_{0->2}: gradients (Eotvos)
     _N_from_eps = apply(_eps / ARCSEC * R_EARTH, inverse_laplacian(L) * physics.ethbar_multiplier(L, 1), 1, 0)  # C_{1->0}
-    _ks = multiplier(L, lambda el: np.where(el > 1, 1 / np.sqrt(np.maximum((el - 1) * el * (el + 1) * (el + 2), 1)), 0))
-    _N_from_grad = apply(_grad * 2 * R_EARTH**2 / (GAMMA * 1e9), _ks, 2, 0)  # C_{2->0}, as Kaiser-Squires
+    _inv = multiplier(L, lambda el: np.where(el > 1, 1 / np.sqrt(np.maximum((el - 1) * el * (el + 1) * (el + 2), 1)), 0))
+    _N_from_grad = apply(_grad * 2 * R_EARTH**2 / (GAMMA * 1e9), _inv, 2, 0)  # C_{2->0}
     _errs = (l2_rel(_eps_vm, _eps), l2_rel(_N_from_eps, _N), l2_rel(_N_from_grad, _N))
 
-    _fig = Figure(figsize=(13, 7.4), layout="constrained")
-    mollweide(_fig.add_subplot(2, 3, 1, projection="mollweide"), _N, cmap="RdBu_r", coast=True, title="geoid height $N$ (m), EGM2008")
-    mollweide(_fig.add_subplot(2, 3, 2, projection="mollweide"), _dg, cmap="RdBu_r", coast=True, vmax=robust_vmax(_dg), title="gravity anomaly $\\Delta g=\\mathcal{C}_{0\\to0}N$ (mGal)")
+    _fig = Figure(figsize=(13, 8.4), layout="constrained")
+    mollweide(_fig.add_subplot(2, 3, 1, projection="mollweide"), _N, coast=True, title="(a) geoid height $N$", label="m")
+    mollweide(_fig.add_subplot(2, 3, 2, projection="mollweide"), _dg, coast=True, vmax=robust_vmax(_dg), title="(b) gravity anomaly $\\Delta g=\\mathcal{C}_{0\\to0}N$", label="mGal")
     _ax = _fig.add_subplot(2, 3, 3, projection="mollweide")
-    mollweide(_ax, _eps, 1, part="abs", cmap="YlOrBr", coast=True, title="deflection of the vertical $\\varepsilon=\\mathcal{C}_{0\\to1}N$ (arcsec)")
+    mollweide(_ax, _eps, 1, part="abs", cmap="YlOrBr", coast=True, title="(c) deflection of the vertical $\\varepsilon=\\mathcal{C}_{0\\to1}N$", label="arcsec")
     mollweide_glyphs(_ax, _eps, 1, n_glyph=800, size=0.018)
     orthographic(_fig.add_subplot(2, 3, 4), _N, 0, lat0=np.radians(-5), lon0=np.radians(80), glyph_flm=_eps, glyph_s=1, coast=True,
-                 title=f"Indian Ocean geoid low with $\\varepsilon$\nVening Meinesz $\\mathcal{{C}}_{{0\\to1}}\\Delta g$ vs $\\eth N/R$: {_errs[0]:.0e}")
+                 title="(d) Indian Ocean: $N$ and $\\varepsilon$", label="m")
     orthographic(_fig.add_subplot(2, 3, 5), _grad, 2, part="abs", cmap="YlOrBr", lat0=np.radians(-20), lon0=np.radians(-75), coast=True,
-                 title=f"gravity gradients $\\Gamma=\\mathcal{{C}}_{{0\\to2}}N$ (E), Andes\n$N$ from $\\Gamma$ by $\\mathcal{{C}}_{{2\\to0}}$: {_errs[2]:.0e}")
+                 title="(e) Andes: gravity gradients $\\Gamma=\\mathcal{C}_{0\\to2}N$", label="E")
     orthographic(_fig.add_subplot(2, 3, 6), _N_from_eps, 0, lat0=np.radians(-5), lon0=np.radians(140), coast=True,
-                 title=f"geoid from deflections by $\\mathcal{{C}}_{{1\\to0}}$: error {_errs[1]:.0e}\nIndonesia and New Guinea")
-    _fig.suptitle("Gravity: the geoid and its derivatives of spin 0, 1 and 2, related by lifted convolutions", fontsize=10)
-    _fig
+                 title="(f) New Guinea: $N$ recovered from $\\varepsilon$ by $\\mathcal{C}_{1\\to0}$", label="m")
+    mo.vstack([mo.as_html(_fig), mo.md(r"""
+    **Figure 2.** The gravity field of the Earth from EGM2008, as fields of spin 0, 1 and 2 related by lifted convolutions.  Top, from left to right: (a) the geoid height $N$, shown as colour in metres on a diverging scale, red above and blue below the reference ellipsoid; (b) the gravity anomaly $\Delta g=\mathcal{C}_{0\to0}N$, shown as colour in mGal ($10^{-5}$ m s$^{-2}$) on a diverging scale saturated at the 99.5th percentile of its modulus; (c) the modulus of the deflection of the vertical $\varepsilon=\mathcal{C}_{0\to1}N$, shown as colour in arcseconds, with $\varepsilon$ drawn as arrows, which point down the slope of the geoid and whose lengths grow in proportion to $|\varepsilon|$ from 35 per cent of the largest length.  Bottom, orthographic views: (d) the Indian Ocean, centred on 5°S, 80°E, with $N$ shown as colour in metres and $\varepsilon$ drawn as arrows as in (c); (e) the Andes, centred on 20°S, 75°W, with the modulus of the gravity gradients $\Gamma=\mathcal{C}_{0\to2}N$ shown as colour in Eötvös ($10^{-9}$ s$^{-2}$) and $\Gamma$ drawn as headless sticks along the horizontal direction in which the second derivative of the disturbing potential is largest, whose lengths grow in proportion to $|\Gamma|$ from 35 per cent of the largest length; and (f) Indonesia and New Guinea, centred on 5°S, 140°E, with the geoid height recovered from the deflections of the vertical by $\mathcal{C}_{1\to0}$ shown as colour in metres.  The deflections point into the geoid low of the Indian Ocean and away from the geoid high over New Guinea, and the gradients are largest along the Andes and the adjacent trench.  The formula of Vening Meinesz, $\mathcal{C}_{0\to1}$ applied to $\Delta g$, reproduces $\varepsilon$ to a relative error of %.0e, and the geoid is recovered from $\varepsilon$ and from $\Gamma$ to relative errors of %.0e and %.0e.
+    """ % _errs)])
     return
 
 
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## 3. The Earth's magnetic field: a potential field of spin 0 and 1, continued to the core
+    ## 3. The geomagnetic field: a potential field of spin 0 and 1, continued to the core
 
-    Outside its sources the main geomagnetic field is the gradient of a potential, $B=-\nabla V$, and the International Geomagnetic Reference Field (IGRF-14, epoch 2025; Alken *et al.* 2021 for the model) gives $V$ as spherical harmonics up to degree 13.  With $v=V/R$ on the Earth's surface, the radial field is the scalar $B_r=\mathcal{C}_{0\to0}[\ell+1]\,v$ and the horizontal field is the spin-1 field $B_\theta+\mathrm{i}B_\varphi=\eth v=\mathcal{C}_{0\to1}[\sqrt{\ell(\ell+1)}]\,v$.  A compass needle points along the horizontal field, and the declination (the angle of the needle east of geographic north) and the inclination (the dip below the horizontal) are its argument and the ratio of its modulus to $B_r$; the contour marks the agonic line of zero declination.
+    Outside its sources the main magnetic field of the Earth, generated by the dynamo in the fluid outer core, is the gradient of a potential, $\mathbf{B}=-\nabla V$, which the International Geomagnetic Reference Field provides as spherical harmonic coefficients up to degree 13 (IGRF-14, epoch 2025; the model is described by Alken *et al.* 2021).  With $v=V/R_\oplus$ on the surface of the Earth, the radial component of the field is the scalar field $B_r=\mathcal{C}_{0\to0}[\ell+1]\,v$, and the horizontal component is the spin-1 field $B_\theta+\mathrm{i}B_\varphi=\eth v=\mathcal{C}_{0\to1}[\sqrt{\ell(\ell+1)}]\,v$, which is the field that aligns a compass needle.  The declination, the angle by which the needle deviates east of geographic north, is the direction of the horizontal field measured from north, and the inclination, the angle by which the field dips below the horizontal, follows from the ratio of $-B_r$ to the modulus of the horizontal field.  The magnetic equator is the line of zero inclination, and the agonic lines are those of zero declination.
 
-    **Continuation to the core.**  Each degree of a potential field decays with radius as $r^{-(\ell+2)}$, so that the field at the core–mantle boundary, $r_c=3485$ km, follows from that at the surface by the multiplier $(R/r_c)^{\ell+2}$, the downward continuation.  It is spin-preserving, and applies to the radial field as $\mathcal{C}_{0\to0}$ and to the horizontal *vector* field as $\mathcal{C}_{1\to1}$, directly and without any reference to its components.  Downward continuation amplifies the high degrees by up to $(R/r_c)^{15}\approx8500$, and reveals the flux patches of the core field beneath the polar regions and the reversed flux beneath the South Atlantic, the origin of the South Atlantic Anomaly.
+    Each degree $\ell$ of a potential field of internal origin decays with radius as $r^{-(\ell+2)}$, so that the field at the boundary between the core and the mantle, at radius $r_c=3485$ km, follows from that at the surface by the multiplier $(R_\oplus/r_c)^{\ell+2}$, the so-called downward continuation.  The multiplier preserves spin, and we apply it to the radial field as $\mathcal{C}_{0\to0}$ and to the horizontal vector field as $\mathcal{C}_{1\to1}$, directly and without reference to its components.  Downward continuation amplifies the coefficients of degree 13 by $(R_\oplus/r_c)^{15}\approx8500$ and reveals the structure of the field at the top of the core: intense patches of flux at high latitudes, and patches of reversed flux beneath the South Atlantic and southern Africa, which weaken the surface field over the South Atlantic in the so-called South Atlantic Anomaly.
     """)
     return
 
@@ -481,60 +497,76 @@ def _(L):
     _b_r = apply(_v, multiplier(L, lambda el: el + 1), 0, 0)  # C_{0->0}
     _b_h = physics.eth(_v, 0)  # C_{0->1}: B_theta + i B_phi
     _core = multiplier(L, lambda el: (R_EARTH / R_CORE) ** (el + 2))
-    _b_r_core, _b_h_core = apply(_b_r, _core, 0, 0) / 1e3, apply(_b_h, _core, 1, 1) / 1e3  # C_{0->0}, C_{1->1} (muT)
+    _b_r_core, _b_h_core = apply(_b_r, _core, 0, 0) / 1e6, apply(_b_h, _core, 1, 1) / 1e6  # C_{0->0}, C_{1->1} (mT)
     _f_h, (_th, _ph) = field_grid(_b_h, 1)
     _f_r, _ = field_grid(_b_r, 0)
     _decl = np.degrees(np.arctan2(_f_h.imag, -_f_h.real))  # east of north
     _incl = np.degrees(np.arctan2(-_f_r.real, np.abs(_f_h)))
 
-    _fig = Figure(figsize=(13, 7.4), layout="constrained")
-    mollweide(_fig.add_subplot(2, 3, 1, projection="mollweide"), _b_r / 1e3, coast=True, title="radial field $B_r=\\mathcal{C}_{0\\to0}v$ at the surface ($\\mu$T)")
+    _fig = Figure(figsize=(13, 8.4), layout="constrained")
+    mollweide(_fig.add_subplot(2, 3, 1, projection="mollweide"), _b_r / 1e3, coast=True, title="(a) radial field $B_r=\\mathcal{C}_{0\\to0}v$", label="$\\mu$T")
     _ax = _fig.add_subplot(2, 3, 2, projection="mollweide")
-    mollweide(_ax, _b_h / 1e3, 1, part="abs", coast=True, title="horizontal field $\\eth v=\\mathcal{C}_{0\\to1}v$ ($\\mu$T): compass needles")
+    mollweide(_ax, _b_h / 1e3, 1, part="abs", coast=True, title="(b) horizontal field $\\eth v=\\mathcal{C}_{0\\to1}v$", label="$\\mu$T")
     mollweide_glyphs(_ax, _b_h, 1, n_glyph=600)
     mollweide_grid(_fig.add_subplot(2, 3, 3, projection="mollweide"), _decl, _th, _ph, vmax=30, coast=True, contours=[-20, -10, 0, 10, 20],
-                   title="declination (degrees east of north), every $10^\\circ$")
+                   title="(c) declination", label="degrees east of north")
     mollweide_grid(_fig.add_subplot(2, 3, 4, projection="mollweide"), _incl, _th, _ph, vmax=90, coast=True, contours=[0],
-                   title="inclination (degrees), magnetic equator")
-    mollweide(_fig.add_subplot(2, 3, 5, projection="mollweide"), _b_r_core, coast=True, title="$B_r$ continued to the core–mantle boundary (mT)")
+                   title="(d) inclination", label="degrees below the horizontal")
+    mollweide(_fig.add_subplot(2, 3, 5, projection="mollweide"), _b_r_core, coast=True, title="(e) $B_r$ at the core–mantle boundary, $\\mathcal{C}_{0\\to0}$", label="mT")
     orthographic(_fig.add_subplot(2, 3, 6), _b_r_core, 0, lat0=np.pi / 2 - 1e-3, lon0=0.0, glyph_flm=_b_h_core, glyph_s=1, coast=True,
-                 title="core–mantle boundary under the Arctic:\n$B_r$ and the horizontal field $\\mathcal{C}_{1\\to1}\\eth v$")
-    _fig.suptitle("The geomagnetic field (IGRF-14, 2025) as spin-0 and spin-1 fields, and its downward continuation", fontsize=10)
-    _fig
+                 title="(f) core–mantle boundary beneath the Arctic", label="mT")
+    mo.vstack([mo.as_html(_fig), mo.md(r"""
+    **Figure 3.** The geomagnetic field of IGRF-14 in 2025, as fields of spin 0 and 1, and its downward continuation to the core.  Top, from left to right: (a) the radial field $B_r=\mathcal{C}_{0\to0}v$ at the surface, shown as colour in μT on a diverging scale, blue where the field points into the Earth, as in the northern hemisphere, and red where it points out; (b) the modulus of the horizontal field $\eth v=\mathcal{C}_{0\to1}v$, shown as colour in μT on a sequential scale, with $\eth v$ drawn as arrows in the direction in which a compass needle points, whose lengths grow in proportion to the modulus from 35 per cent of the largest length; (c) the declination, shown as colour in degrees east of geographic north on a diverging scale saturated at ±30°, red to the east and blue to the west, with contours every 10°, solid to the east and dashed to the west, among which the solid contours of 0° are the agonic lines.  Bottom: (d) the inclination, shown as colour in degrees below the horizontal, red where the field dips into the Earth and blue where it points out of it, with the magnetic equator as the contour of zero inclination; (e) the radial field continued by $\mathcal{C}_{0\to0}$ to the boundary between the core and the mantle, shown as colour in mT on a diverging scale as in (a); and (f) an orthographic view of the same boundary centred on the North pole, with the continued radial field shown as colour in mT and the horizontal field continued by $\mathcal{C}_{1\to1}$ drawn as arrows as in (b), with the coastlines projected radially onto the boundary for orientation.  The compass needles point towards the north magnetic pole in the Canadian Arctic, the declination is small over Europe and Africa and changes sign across the agonic lines, and at the core the flux is concentrated in patches at high latitudes, with reversed flux, red in the southern hemisphere, beneath the South Atlantic and southern Africa.
+    """)])
     return
 
 
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## 4. Near-surface wind: vorticity, divergence and why spin matters (spin 1)
+    ## 4. Wind: vorticity, divergence and smoothing (spin 1)
 
-    The January near-surface wind, averaged over 1991–2020 (NCEP/NCAR reanalysis, Kalnay *et al.* 1996), with northward and eastward components $(v,u)$, is the spin-1 field ${}_1f=-v+\mathrm{i}u$.
+    We consider the near-surface wind in January, averaged over 1991–2020, from the NCEP/NCAR reanalysis (Kalnay *et al.* 1996).  With northward and eastward components $(v,u)$, and since $e_\theta$ points south, the wind is the spin-1 field ${}_1f=-v+\mathrm{i}u$.
 
-    **Vorticity and divergence.**  For a spin-1 field, $\bar\eth\,{}_1f=-R_\oplus(\nabla\cdot v+\mathrm{i}\,\hat r\cdot\nabla\times v)$: the single lifted convolution $\mathcal{C}_{1\to0}$ gives the divergence and the vorticity together, as the real and imaginary parts of a scalar field, with no finite differences and no special treatment of the poles.  The vorticity shows the cyclones of the Aleutian and Icelandic lows (positive in the north) and the anticyclones of the subtropics; the divergence shows the convergence of the trade winds into the intertropical convergence zone.  Since $\eth\bar\eth$ is the Laplacian on spin-1 fields, $\mathcal{C}_{0\to1}$ applied to the inverse Laplacian of each part gives the Helmholtz decomposition into a divergence-free part (the rotational flow of the westerlies and the trades) and a curl-free part (the flow into the convergence zone), which sum to the wind exactly.
+    For a spin-1 field the spin lowering operator gives the divergence and the vorticity, i.e. the radial component of the curl, together, $\bar\eth\,{}_1f=-R_\oplus(\nabla\cdot\mathbf{v}+\mathrm{i}\,\hat{\mathbf{r}}\cdot\nabla\times\mathbf{v})$, so that the single lifted convolution $\mathcal{C}_{1\to0}$ yields both as the real and imaginary parts of one scalar field, exactly for the band-limited field, without finite differences and without special treatment of the poles.  Since $\eth\bar\eth$ is the Laplacian on spin-1 fields, applying the lifted convolution $\mathcal{C}_{0\to1}$ of $\eth\nabla^{-2}$ to the divergence and to the vorticity separately gives the Helmholtz decomposition of the wind into a curl-free part, the flow into and out of regions of convergence, and a divergence-free part, the rotational flow of the trade winds and the westerlies, which sum to the wind exactly.
 
-    **Why spin matters.**  Smoothing the wind by a Gaussian is the spin-preserving lifted convolution $\mathcal{C}_{1\to1}$, a single multiplier.  A common shortcut smooths the components $v_\theta$ and $v_\varphi$ as if they were two scalar maps.  Since the frame $(e_\theta,e_\varphi)$ turns around the pole, this averages vectors expressed in different frames: near the pole the components change rapidly even where the wind is uniform, and component-wise smoothing distorts the flow.  The poles of the coordinates are a convention, and nothing prevents placing one where the wind is strongest, centred in the lower row.  The spin-1 smoothing gives the same wind in either system of coordinates, to machine precision, since it is rotation-equivariant.  The component-wise smoothing gives a reasonable result in geographic coordinates, where the jet is far from the poles, but with the coordinate pole in the strong flow it mixes the components across the turning frame and destroys the flow at the centre: its result depends on the choice of coordinates.
+    Smoothing the wind by a Gaussian is the spin-preserving lifted convolution $\mathcal{C}_{1\to1}$ whose kernel is the Gaussian multiplier.  A common alternative smooths the components $v_\theta$ and $v_\varphi$ as though they were two scalar fields.  Since the frame $(e_\theta,e_\varphi)$ turns around the poles of the coordinates, this averages vectors expressed in different frames, and near a pole the components vary rapidly even where the wind itself is uniform.  The poles of the coordinates are, however, a matter of convention, and to expose the dependence of each method on that convention we place one pole at the location of the strongest smoothed wind and smooth in both systems of coordinates.  The spin-1 smoothing, which is rotation-equivariant, gives the same result in either system to machine precision.  The component-wise smoothing gives a plausible result in geographic coordinates, where the strongest winds lie far from the poles, but with the pole placed in the strong flow it combines the components across the turning frame and destroys the flow near the pole, so that its result depends on the choice of coordinates.
     """)
     return
 
 
 @app.cell
 def _(L):
-    _wind, _ = example_field("wind", L)
+    wind, _ = example_field("wind", L)
+    return (wind,)
+
+
+@app.cell
+def _(wind):
+    _wind = wind
     _h = helmholtz(_wind, R_EARTH)
     _view = dict(lat0=np.radians(20), lon0=np.radians(-150))
-    _fig = Figure(figsize=(13, 7.4), layout="constrained")
+    _fig = Figure(figsize=(13, 8.4), layout="constrained")
     _ax = _fig.add_subplot(2, 3, 1, projection="mollweide")
-    mollweide(_ax, _wind, 1, part="abs", coast=True, title="January near-surface wind ${}_1f$ (m/s)")
+    mollweide(_ax, _wind, 1, part="abs", coast=True, title="(a) January near-surface wind ${}_1f$", label="m s$^{-1}$")
     mollweide_glyphs(_ax, _wind, 1)
-    mollweide(_fig.add_subplot(2, 3, 2, projection="mollweide"), _h["curl"] * 1e5, coast=True, vmax=robust_vmax(_h["curl"] * 1e5), title="vorticity $-\\mathrm{Im}\\,\\bar\\eth\\,{}_1f/R_\\oplus$ ($10^{-5}$ s$^{-1}$)")
-    mollweide(_fig.add_subplot(2, 3, 3, projection="mollweide"), _h["div"] * 1e5, coast=True, vmax=robust_vmax(_h["div"] * 1e5), title="divergence $-\\mathrm{Re}\\,\\bar\\eth\\,{}_1f/R_\\oplus$ ($10^{-5}$ s$^{-1}$)")
-    orthographic(_fig.add_subplot(2, 3, 4), _wind, 1, part="abs", **_view, coast=True, title="the wind over the Pacific")
-    orthographic(_fig.add_subplot(2, 3, 5), _h["f_rot"], 1, part="abs", **_view, coast=True, title="divergence-free part $\\mathcal{C}_{0\\to1}\\nabla^{-2}\\mathrm{curl}$")
-    orthographic(_fig.add_subplot(2, 3, 6), _h["f_div"], 1, part="abs", **_view, coast=True,
-                 title=f"curl-free part; the two sum to ${{}}_1f$ to {l2_rel(_h['f_rot'] + _h['f_div'], _wind):.0e}")
-    _fig.suptitle("Vorticity, divergence and the Helmholtz decomposition of the wind by lifted convolutions $\\mathcal{C}_{1\\to0}$ and $\\mathcal{C}_{0\\to1}$", fontsize=10)
+    mollweide(_fig.add_subplot(2, 3, 2, projection="mollweide"), _h["curl"] * 1e5, coast=True, vmax=robust_vmax(_h["curl"] * 1e5),
+              title="(b) vorticity $-\\mathrm{Im}\\,\\bar\\eth\\,{}_1f/R_\\oplus$", label="$10^{-5}$ s$^{-1}$")
+    mollweide(_fig.add_subplot(2, 3, 3, projection="mollweide"), _h["div"] * 1e5, coast=True, vmax=robust_vmax(_h["div"] * 1e5),
+              title="(c) divergence $-\\mathrm{Re}\\,\\bar\\eth\\,{}_1f/R_\\oplus$", label="$10^{-5}$ s$^{-1}$")
+    orthographic(_fig.add_subplot(2, 3, 4), _wind, 1, part="abs", **_view, coast=True, title="(d) the wind over the North Pacific", label="m s$^{-1}$")
+    orthographic(_fig.add_subplot(2, 3, 5), _h["f_rot"], 1, part="abs", **_view, coast=True, title="(e) divergence-free part", label="m s$^{-1}$")
+    orthographic(_fig.add_subplot(2, 3, 6), _h["f_div"], 1, part="abs", **_view, coast=True, title="(f) curl-free part", label="m s$^{-1}$")
+    _sum_err = l2_rel(_h["f_rot"] + _h["f_div"], _wind)
+    mo.vstack([mo.as_html(_fig), mo.md(r"""
+    **Figure 4.** The January near-surface wind and its vorticity, divergence and Helmholtz decomposition, from the lifted convolutions $\mathcal{C}_{1\to0}$ and $\mathcal{C}_{0\to1}$.  Top, from left to right: (a) the wind speed $|{}_1f|$, shown as colour in m s$^{-1}$ on a sequential scale, with the wind ${}_1f$ drawn as arrows pointing downwind, whose lengths grow in proportion to the speed from 35 per cent of the largest length; (b) the vorticity $-\mathrm{Im}(\bar\eth\,{}_1f)/R_\oplus$ and (c) the divergence $-\mathrm{Re}(\bar\eth\,{}_1f)/R_\oplus$, each shown as colour in $10^{-5}$ s$^{-1}$ on a diverging scale saturated at the 99.5th percentile of its modulus, so that the extreme values over the steep margins of the Greenland and Antarctic ice sheets do not set the scale, red for anticlockwise rotation and for outflow and blue for clockwise rotation and for inflow.  Bottom: orthographic views of the North Pacific, centred on 20°N, 150°W, of (d) the wind, (e) its divergence-free part and (f) its curl-free part, each with its speed shown as colour in m s$^{-1}$ and drawn as arrows as in (a).  The vorticity is positive in the cyclonic flow around the Aleutian and Icelandic lows and negative in the anticyclones of the northern subtropics, and the divergence is negative along the intertropical convergence zone, into which the trade winds of both hemispheres flow.  The divergence-free part carries the trade winds and the westerlies, the curl-free part carries the flow into the convergence zone and out of the subtropical highs, and the two parts sum to the wind to a relative error of %.0e.
+    """ % _sum_err)])
+    return
 
+
+@app.cell
+def _(L, wind):
+    _wind = wind
     _beam = gaussian(L, 8 / L)
     _spin = apply(_wind, _beam, 1, 1)
     _speed, (_th, _ph) = field_grid(_spin, 1)
@@ -546,26 +578,26 @@ def _(L):
     _comp = componentwise(_wind, 1, _beam)
     _comp_moved = _back(componentwise(_to_pole(_wind), 1, _beam))
     _jet = dict(lat0=_lat, lon0=_lon, coast=True, n_glyph=1400, glyph_len=0.05)
-    _vmax = float(np.max(np.abs(field_grid(_spin, 1)[0])))
-    _fig2 = Figure(figsize=(13, 3.9), layout="constrained")
-    orthographic(_fig2.add_subplot(1, 4, 1), _spin, 1, part="abs", vmax=_vmax, **_jet,
-                 title=f"smoothed as a spin-1 field $\\mathcal{{C}}_{{1\\to1}}$; with the\ncoordinate pole at the centre: difference {l2_rel(_spin_moved, _spin):.0e}")
-    orthographic(_fig2.add_subplot(1, 4, 2), _comp, 1, part="abs", vmax=_vmax, **_jet, title="components smoothed as scalars,\ngeographic coordinates")
-    orthographic(_fig2.add_subplot(1, 4, 3), _comp_moved, 1, part="abs", vmax=_vmax, **_jet,
-                 title="components smoothed as scalars,\ncoordinate pole at the centre")
+    _vmax = float(np.max(np.abs(_speed)))
+    _fig2 = Figure(figsize=(13, 4.6), layout="constrained")
+    orthographic(_fig2.add_subplot(1, 4, 1), _spin, 1, part="abs", vmax=_vmax, **_jet, title="(a) spin-1 smoothing $\\mathcal{C}_{1\\to1}$", label="m s$^{-1}$")
+    orthographic(_fig2.add_subplot(1, 4, 2), _comp, 1, part="abs", vmax=_vmax, **_jet, title="(b) components as scalars,\ngeographic coordinates", label="m s$^{-1}$")
+    orthographic(_fig2.add_subplot(1, 4, 3), _comp_moved, 1, part="abs", vmax=_vmax, **_jet, title="(c) components as scalars,\npole at the centre", label="m s$^{-1}$")
     orthographic(_fig2.add_subplot(1, 4, 4), _comp_moved - _spin, 1, part="abs", cmap="Greys", vmax=_vmax, glyph_floor=0.0, **_jet,
-                 title=f"its error, on the same scale:\nrelative $L^2$ error {l2_rel(_comp_moved, _spin):.0e} over the sphere")
-    _fig2.suptitle("Smoothing a vector field: the spin-1 convolution against smoothing the components as scalars", fontsize=10)
-    mo.vstack([mo.as_html(_fig), mo.as_html(_fig2)])
+                 title="(d) difference of (c) and (a)", label="m s$^{-1}$")
+    mo.vstack([mo.as_html(_fig2), mo.md(r"""
+    **Figure 5.** Smoothing the wind as a spin-1 field and as two scalar components.  Orthographic views centred on the strongest wind after smoothing, at %.0f°%s, %.0f°%s, of the wind smoothed by a Gaussian of width $8/L$ radians, each with its speed shown as colour in m s$^{-1}$ on a common sequential scale and drawn as arrows as in Fig. 4.  From left to right: (a) the smoothing by the spin-1 convolution $\mathcal{C}_{1\to1}$, which, with the pole of the coordinates placed at the centre of the view, gives the same result to a relative error of %.0e; (b) the smoothing of the components $v_\theta$ and $v_\varphi$ as scalar fields in geographic coordinates; (c) the same smoothing of the components with the pole of the coordinates at the centre of the view; and (d) the modulus of the difference between (c) and (a), shown as colour on the same scale, from white to black, with the difference drawn as arrows whose lengths are proportional to its modulus.  The component-wise smoothing agrees closely with the spin-1 smoothing in geographic coordinates, but with the pole at the centre it destroys the flow within about the width of the smoothing of the pole, where the frame turns fastest, with a relative error of %.0e over the sphere.
+    """ % (abs(np.degrees(_lat)), "N" if _lat >= 0 else "S", abs(((np.degrees(_lon) + 180) % 360) - 180), "E" if ((np.degrees(_lon) + 180) % 360) - 180 >= 0 else "W",
+           l2_rel(_spin_moved, _spin), l2_rel(_comp_moved, _spin)))])
     return
 
 
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## 5. Ocean surface currents: gyres and upwelling (spin 1)
+    ## 5. Ocean currents: gyres and upwelling (spin 1)
 
-    The surface currents of 2025 (GODAS, Behringer & Xue 2004) are a spin-1 field like the wind, set to zero on land.  The same lifted convolution $\mathcal{C}_{1\to0}$ gives their vorticity and divergence, and the stream function $\psi=R_\oplus^2\nabla^{-2}(\hat r\cdot\nabla\times v)$ of their rotational part, whose contours are the streamlines of the divergence-free flow: they trace the great subtropical gyres, clockwise in the northern hemisphere and anticlockwise in the southern, and the Antarctic Circumpolar Current.  (The stream function is defined over the whole sphere, and has no meaning over land, where the currents vanish.)  The divergence of the surface flow marks upwelling, where the Ekman transport driven by the trade winds carries surface water away from the equator and cold, nutrient-rich water rises in its place: the equatorial Pacific and Atlantic cold tongues and the coastal upwelling off Peru and West Africa.  The Earth's rotation reverses the direction of the Ekman transport across the equator, which is what makes the equatorial surface flow diverge.
+    The surface currents of the ocean in 2025, averaged over the year at a depth of 5 m, from the Global Ocean Data Assimilation System (GODAS; Behringer & Xue 2004), form a spin-1 field like the wind, which we set to zero on land.  The lifted convolution $\mathcal{C}_{1\to0}$ again gives their vorticity and divergence.  The stream function $\psi=R_\oplus^2\nabla^{-2}(\hat{\mathbf{r}}\cdot\nabla\times\mathbf{v})$ of the divergence-free part, obtained from the vorticity by the inverse Laplacian, has as its contours the streamlines of that flow, along which the rotational part of the current runs with higher values of $\psi$ to its right; it is defined over the whole sphere, including the land, where it has no physical meaning.  The streamlines trace the subtropical gyres, which circulate clockwise in the northern hemisphere and anticlockwise in the southern hemisphere, and the Antarctic Circumpolar Current.  The divergence of the surface flow marks upwelling, where water rises from below to replace surface water that is carried away.  The trade winds drive an Ekman transport of the surface water to the right of the wind in the northern hemisphere and to its left in the southern hemisphere, i.e. away from the equator on both sides, so that the surface flow diverges along the equator, in the cold tongues of the eastern Pacific and Atlantic, and along the coasts of Peru and north-west Africa, where the winds blow along the coast.
     """)
     return
 
@@ -577,18 +609,20 @@ def _(L):
     _psi = _h["psi"] / 1e6  # 10^6 m^2/s
     _psi_grid, _ = field_grid(_psi)
     _levels = np.linspace(-1, 1, 13) * np.max(np.abs(_psi_grid.real))
-    _fig = Figure(figsize=(13, 7.4), layout="constrained")
+    _div = _h["div"] * 1e7
+    _fig = Figure(figsize=(13, 8.6), layout="constrained")
     _ax = _fig.add_subplot(2, 2, 1, projection="mollweide")
-    mollweide(_ax, _cur, 1, part="abs", coast=True, title="surface current speed (m/s) and direction, 2025")
+    mollweide(_ax, _cur, 1, part="abs", coast=True, title="(a) surface currents ${}_1f$, 2025", label="m s$^{-1}$")
     mollweide_glyphs(_ax, _cur, 1, n_glyph=1200, size=0.02, floor=0.0)
     mollweide(_fig.add_subplot(2, 2, 2, projection="mollweide"), _psi, coast=True, contours=_levels,
-              title="stream function $\\psi$ of the rotational flow ($10^6$ m$^2$/s): the gyres")
-    mollweide(_fig.add_subplot(2, 2, 3, projection="mollweide"), _h["div"] * 1e7, coast=True, vmax=robust_vmax(_h["div"] * 1e7),
-              title="divergence $-\\mathrm{Re}\\,\\bar\\eth\\,{}_1f/R_\\oplus$ ($10^{-7}$ s$^{-1}$): upwelling")
-    orthographic(_fig.add_subplot(2, 2, 4), _h["div"] * 1e7, 0, lat0=np.radians(-5), lon0=np.radians(-110), glyph_flm=_cur, glyph_s=1, coast=True, glyph_floor=0.0, vmax=robust_vmax(_h["div"] * 1e7),
-                 title="the eastern equatorial Pacific: divergence and currents")
-    _fig.suptitle("Ocean surface currents: stream function and upwelling from the lifted convolution $\\mathcal{C}_{1\\to0}$", fontsize=10)
-    _fig
+              title="(b) stream function $\\psi$ and streamlines", label="$10^6$ m$^2$ s$^{-1}$")
+    mollweide(_fig.add_subplot(2, 2, 3, projection="mollweide"), _div, coast=True, vmax=robust_vmax(_div),
+              title="(c) divergence $-\\mathrm{Re}\\,\\bar\\eth\\,{}_1f/R_\\oplus$", label="$10^{-7}$ s$^{-1}$")
+    orthographic(_fig.add_subplot(2, 2, 4), _div, 0, lat0=np.radians(-5), lon0=np.radians(-110), glyph_flm=_cur, glyph_s=1, coast=True, glyph_floor=0.0,
+                 vmax=robust_vmax(_div), title="(d) eastern equatorial Pacific", label="$10^{-7}$ s$^{-1}$")
+    mo.vstack([mo.as_html(_fig), mo.md(r"""
+    **Figure 6.** The surface currents of the ocean in 2025, their stream function and their divergence, from the lifted convolution $\mathcal{C}_{1\to0}$.  Top: (a) the current speed $|{}_1f|$, shown as colour in m s$^{-1}$ on a sequential scale, with the current drawn as arrows pointing downstream, whose lengths are proportional to the speed; (b) the stream function $\psi$ of the divergence-free part, shown as colour in $10^6$ m$^2$ s$^{-1}$ on a diverging scale, with twelve equally spaced contours, the streamlines, drawn solid for positive and dashed for negative values.  Bottom: (c) the divergence $-\mathrm{Re}(\bar\eth\,{}_1f)/R_\oplus$, shown as colour in $10^{-7}$ s$^{-1}$ on a diverging scale saturated at the 99.5th percentile of its modulus, red where the surface flow diverges and water upwells and blue where it converges; and (d) an orthographic view of the eastern equatorial Pacific, centred on 5°S, 110°W, with the divergence shown as colour as in (c) and the currents drawn as arrows as in (a).  The fastest currents are the westward equatorial currents of the Pacific, Atlantic and Indian Oceans; the subtropical gyres appear as maxima of $\psi$, red, in the northern hemisphere and minima, blue, in the southern hemisphere; and the divergence is concentrated along the equator in the Pacific and Atlantic and along the coast of Peru, where the equatorial currents diverge from the equator.
+    """)])
     return
 
 
@@ -597,59 +631,83 @@ def _():
     mo.md(r"""
     ## 6. Polarisation of the cosmic microwave background (spin 2)
 
-    The linear polarisation of the CMB, $Q+\mathrm{i}U$, is a spin-2 field.  Its physically meaningful parts are two scalar fields, the $E$ and $B$ modes: by Proposition VI.8(b), $a_E=-\tfrac12(a_2+a_{-2})$ and $a_B=\tfrac{\mathrm{i}}2(a_2-a_{-2})$ are sums of the lifted convolutions $\mathcal{C}_{2\to0}$ and $\mathcal{C}_{-2\to0}$, and $\mathcal{C}_{0\to2}$ builds the polarisation of each mode alone.  Scalar (density) perturbations in the early Universe make only $E$ modes, whose polarisation is radial or tangential around the extrema of $E$; gravitational lensing of the $E$ modes by the large-scale structure makes a small $B$ mode, whose polarisation is at $45^\circ$ to these directions; primordial gravitational waves would add a further $B$ mode, the target of current experiments.
+    The linear polarisation of the cosmic microwave background (CMB), described by the Stokes parameters $Q$ and $U$, is the spin-2 field $Q+\mathrm{i}U$.  Its physical content is carried by two scalar fields, the $E$ and $B$ modes, which do not depend on the frame: by Proposition VI.8(b) of the article, $a_E=-\tfrac12(a_2+a_{-2})$ and $a_B=\tfrac{\mathrm{i}}2(a_2-a_{-2})$, where $a_{\pm2}$ are the coefficients of $Q\pm\mathrm{i}U$, are sums of the lifted convolutions $\mathcal{C}_{2\to0}$ and $\mathcal{C}_{-2\to0}$, while $\mathcal{C}_{0\to2}$ builds the polarisation of each mode alone.  Density perturbations in the early Universe generate only $E$ modes, whose polarisation is tangential around the maxima of $E$ and radial around its minima.  Gravitational lensing of the $E$ modes by the large-scale structure of the Universe converts a small part of them into $B$ modes, whose polarisation lies at $45^\circ$ to these directions around the extrema of $B$, and primordial gravitational waves would generate further $B$ modes, which current experiments seek.
 
-    The simulated maps are a Gaussian realisation of the lensed power spectra of the Planck 2018 best-fit cosmology (Planck Collaboration 2020), with the temperature correlated with $E$.  The measured maps are the Planck 2018 SMICA maps in Galactic coordinates, with the plane of the Galaxy along the equator of the map; their large-scale polarisation mixes signal with noise and residual Galactic emission, and an analysis would mask the plane.  The temperature is drawn with sticks of the polarisation smoothed by the spin-preserving Gaussian $\mathcal{C}_{2\to2}$, as in the maps of WMAP and Planck.
+    We consider both a simulation and the measured sky.  The simulated temperature and polarisation are a Gaussian realisation of the lensed power spectra of the best-fit cosmology of Planck 2018 (Planck Collaboration 2020), with the temperature correlated with $E$ and with a $B$ mode made by lensing alone.  The measured maps are the Planck 2018 SMICA maps of the CMB, in Galactic coordinates, so that the plane of the Galaxy lies along the equator of the Mollweide maps.  On the large scales considered here, the polarisation measured by Planck combines the signal with noise and residual Galactic emission, which is most evident along the Galactic plane and which an analysis would mask.
 
-    **Why spin matters.**  Since the $B$ mode is orders of magnitude fainter than the $E$ mode, any operation that leaks $E$ into $B$ can swamp it.  The last figure smooths a pure-$E$ polarisation field ($B=0$) in two ways.  The spin-2 smoothing $\mathcal{C}_{2\to2}$ is a multiplier of the spin-2 coefficients and leaves $B=0$ exactly.  Smoothing $Q$ and $U$ as two scalar maps leaks $E$ into a spurious $B$ mode, concentrated where the frame turns quickly, around the poles, and larger than the lensing $B$ mode itself (by a factor of about 20 at $L=32$, 6 at $L=64$ and 2 at $L=128$ for this smoothing of six pixels).  The middle figure shows the $E$ and $B$ modes of the simulation and their polarisation, both smoothed so that the patterns around the extrema are visible.
+    The $B$ mode is weaker than the $E$ mode by more than an order of magnitude, so that any operation that leaks $E$ into $B$ can conceal it.  We therefore smooth a polarisation field that contains only $E$ modes in two ways.  The spin-2 smoothing $\mathcal{C}_{2\to2}$ multiplies the spin-2 coefficients, and hence the coefficients of $E$ and $B$, by the same Gaussian, and leaves $B$ exactly zero.  Smoothing $Q$ and $U$ as two scalar fields instead leaks $E$ into a spurious $B$ mode, which is concentrated around the poles of the coordinates, where the frame turns fastest, and which exceeds the $B$ mode generated by lensing, by factors of about 20, 6 and 2 at band-limits of 32, 64 and 128 for a Gaussian of width $6/L$ radians.
     """)
     return
 
 
+@app.function
+def rms(flm):
+    """Root mean square over the sphere of a field, from its harmonic coefficients."""
+    return float(np.sqrt(np.sum(np.abs(np.asarray(flm)) ** 2) / (4 * np.pi)))
+
+
 @app.cell
 def _(L):
-    _el = np.arange(L)
     _beam = gaussian(L, 4 / L)
-    _cmb = {}
+    cmb = {}
     for _src in ("sim", "planck"):
         _t, _ = example_field(f"cmb_{_src}_temperature", L, taper=False)
         _p, _ = example_field(f"cmb_{_src}_polarisation", L, taper=False)
         _e, _b = physics.eb_decomposition(_p)  # C_{2->0} + C_{-2->0}
-        _cmb[_src] = dict(t=_t, p=_p, e=_e, b=_b, p_smooth=apply(_p, _beam, 2, 2))
-    _fig = Figure(figsize=(13, 7.4), layout="constrained")
-    for _row, (_src, _label) in enumerate((("sim", "simulated"), ("planck", "Planck 2018 SMICA"))):
+        cmb[_src] = dict(t=_t, p=_p, e=_e, b=_b, p_smooth=apply(_p, _beam, 2, 2))
+    cmb["pE"] = physics.eb_to_polarisation(cmb["sim"]["e"], 0 * cmb["sim"]["b"])[0]  # C_{0->2}: polarisation of E alone
+    cmb["pB"] = physics.eb_to_polarisation(0 * cmb["sim"]["e"], cmb["sim"]["b"])[0]
+    return (cmb,)
+
+
+@app.cell
+def _(cmb):
+    _cmb = cmb
+    _fig = Figure(figsize=(13, 8.4), layout="constrained")
+    for _row, (_src, _label) in enumerate((("sim", "simulated"), ("planck", "Planck"))):
         _c = _cmb[_src]
         _ax = _fig.add_subplot(2, 3, 3 * _row + 1, projection="mollweide")
-        mollweide(_ax, _c["t"], title=f"{_label}: temperature ($\\mu$K) and polarisation")
+        mollweide(_ax, _c["t"], title=f"({'ad'[_row]}) {_label}: temperature and polarisation", label="$\\mu$K")
         mollweide_glyphs(_ax, _c["p_smooth"], 2)
-        mollweide(_fig.add_subplot(2, 3, 3 * _row + 2, projection="mollweide"), _c["e"], title=f"{_label}: $E=\\mathcal{{C}}_{{2\\to0}}+\\mathcal{{C}}_{{-2\\to0}}$ ($\\mu$K)")
-        mollweide(_fig.add_subplot(2, 3, 3 * _row + 3, projection="mollweide"), _c["b"], title=f"{_label}: $B$ ($\\mu$K)")
-    _fig.suptitle("CMB temperature and polarisation, and the $E$/$B$ decomposition by lifted convolutions", fontsize=10)
-
+        mollweide(_fig.add_subplot(2, 3, 3 * _row + 2, projection="mollweide"), _c["e"], title=f"({'be'[_row]}) {_label}: $E$ mode", label="$\\mu$K")
+        mollweide(_fig.add_subplot(2, 3, 3 * _row + 3, projection="mollweide"), _c["b"], title=f"({'cf'[_row]}) {_label}: $B$ mode", label="$\\mu$K")
     _sim = _cmb["sim"]
-    _pE, _ = physics.eb_to_polarisation(_sim["e"], 0 * _sim["b"])  # C_{0->2}
-    _pB, _ = physics.eb_to_polarisation(0 * _sim["e"], _sim["b"])
-    # smoothed, so that the patterns around the extrema are visible at the resolution of the glyphs
-    _g = gaussian(L, 10 / L)[:, None]
-    _eS, _bS, _pES, _pBS = _sim["e"] * _g, _sim["b"] * _g, _pE * _g, _pB * _g
-    _fig2 = Figure(figsize=(13, 3.9), layout="constrained")
-    orthographic(_fig2.add_subplot(1, 3, 1), _eS, 0, glyph_flm=_pES, glyph_s=2, n_glyph=1200, title="simulated $E$ and its polarisation $\\mathcal{C}_{0\\to2}E$:\nradial and tangential")
-    orthographic(_fig2.add_subplot(1, 3, 2), _bS, 0, glyph_flm=_pBS, glyph_s=2, n_glyph=1200, title="simulated lensing $B$ and its polarisation:\nat $45^\\circ$")
-    orthographic(_fig2.add_subplot(1, 3, 3), _cmb["planck"]["t"], 0, lat0=np.pi / 2 - 1e-3, lon0=0.0, glyph_flm=_cmb["planck"]["p_smooth"], glyph_s=2,
-                 title="Planck: temperature and polarisation\nat the north Galactic pole")
+    mo.vstack([mo.as_html(_fig), mo.md(r"""
+    **Figure 7.** The temperature and polarisation of the CMB, simulated and measured by Planck, and their $E$ and $B$ modes from the lifted convolutions $\mathcal{C}_{2\to0}+\mathcal{C}_{-2\to0}$.  Top: the simulation; bottom: the Planck 2018 SMICA maps, in Galactic coordinates.  From left to right: (a, d) the temperature anisotropy, shown as colour in μK on a diverging scale, red hotter and blue colder than the mean, with the polarisation smoothed by the spin-2 convolution $\mathcal{C}_{2\to2}$ with a Gaussian of width $4/L$ radians drawn as headless sticks along the direction of polarisation, at the angle $\arg(Q+\mathrm{i}U)/2$, whose lengths grow in proportion to the polarised intensity from 35 per cent of the largest length; (b, e) the $E$ mode and (c, f) the $B$ mode, each shown as colour in μK on its own diverging scale.  The simulated $B$ mode, made by lensing alone, has an rms of %.3f μK, %.0f per cent of that of $E$, whereas the $B$ mode measured by Planck on these scales, with an rms of %.2f μK, %.0f per cent of that of $E$, is dominated by noise and by the residual Galactic emission along the equator of the maps.
+    """ % (rms(_sim["b"]), 100 * rms(_sim["b"]) / rms(_sim["e"]), rms(_cmb["planck"]["b"]), 100 * rms(_cmb["planck"]["b"]) / rms(_cmb["planck"]["e"])))])
+    return
 
+
+@app.cell
+def _(L, cmb):
+    _cmb, _sim, _pE, _pB = cmb, cmb["sim"], cmb["pE"], cmb["pB"]
+    _g = gaussian(L, 10 / L)[:, None]  # smoothed, so that the patterns around the extrema are visible
+    _fig2 = Figure(figsize=(13, 4.6), layout="constrained")
+    orthographic(_fig2.add_subplot(1, 3, 1), _sim["e"] * _g, 0, glyph_flm=_pE * _g, glyph_s=2, n_glyph=1200, title="(a) simulated $E$ and $\\mathcal{C}_{0\\to2}E$", label="$\\mu$K")
+    orthographic(_fig2.add_subplot(1, 3, 2), _sim["b"] * _g, 0, glyph_flm=_pB * _g, glyph_s=2, n_glyph=1200, title="(b) simulated $B$ and $\\mathcal{C}_{0\\to2}B$", label="$\\mu$K")
+    orthographic(_fig2.add_subplot(1, 3, 3), _cmb["planck"]["t"], 0, lat0=np.pi / 2 - 1e-3, lon0=0.0, glyph_flm=_cmb["planck"]["p_smooth"], glyph_s=2,
+                 title="(c) Planck at the north Galactic pole", label="$\\mu$K")
+    mo.vstack([mo.as_html(_fig2), mo.md(r"""
+    **Figure 8.** The polarisation patterns of the $E$ and $B$ modes, and the polarisation measured by Planck.  Orthographic views: (a) the simulated $E$ mode, shown as colour in μK on a diverging scale, with the polarisation of the $E$ mode alone, $\mathcal{C}_{0\to2}E$, drawn as headless sticks as in Fig. 7, both smoothed by a Gaussian of width $10/L$ radians so that the patterns are resolved by the sticks; (b) the same for the simulated $B$ mode and its polarisation; and (c) the temperature measured by Planck around the north Galactic pole, shown as colour in μK, with the smoothed polarisation drawn as sticks as in Fig. 7.  The views (a) and (b) are centred on 20°N, 34°E in the coordinates of the simulation.  The sticks of (a) are tangential around the maxima of $E$, red, and radial around its minima, blue, while those of (b) lie at $45^\circ$ to the radial direction around the extrema of $B$, so that they swirl around them.
+    """)])
+    return
+
+
+@app.cell
+def _(L, cmb):
+    _sim, _pE = cmb["sim"], cmb["pE"]
     _smooth_beam = gaussian(L, 6 / L)
     _b_spin = physics.eb_decomposition(apply(_pE, _smooth_beam, 2, 2))[1]
     _b_comp = physics.eb_decomposition(componentwise(_pE, 2, _smooth_beam))[1]
     _b_lens = _sim["b"] * _smooth_beam[:, None]
     _vmax = float(np.max(np.abs(field_grid(_b_comp)[0].real)))
-    _rms = lambda _x: float(np.sqrt(np.sum(np.abs(_x) ** 2) / (4 * np.pi)))
-    _fig3 = Figure(figsize=(13, 3.3), layout="constrained")
-    mollweide(_fig3.add_subplot(1, 3, 1, projection="mollweide"), _b_lens, vmax=_vmax, title=f"lensing $B$, smoothed: rms {_rms(_b_lens):.2g} $\\mu$K")
-    mollweide(_fig3.add_subplot(1, 3, 2, projection="mollweide"), _b_spin, vmax=_vmax, title=f"$B$ of pure $E$ smoothed by $\\mathcal{{C}}_{{2\\to2}}$: rms {_rms(_b_spin):.0e} $\\mu$K")
-    mollweide(_fig3.add_subplot(1, 3, 3, projection="mollweide"), _b_comp, vmax=_vmax, title=f"$B$ of pure $E$ with $Q$, $U$ smoothed as scalars:\nrms {_rms(_b_comp):.2g} $\\mu$K, {_rms(_b_comp) / _rms(_b_lens):.0f} times the lensing $B$")
-    _fig3.suptitle("Leakage of $E$ into $B$: the spin-2 convolution against smoothing $Q$ and $U$ as scalars (same colour scale)", fontsize=10)
-    mo.vstack([mo.as_html(_fig), mo.as_html(_fig2), mo.as_html(_fig3)])
+    _fig3 = Figure(figsize=(13, 3.8), layout="constrained")
+    mollweide(_fig3.add_subplot(1, 3, 1, projection="mollweide"), _b_lens, vmax=_vmax, title="(a) lensing $B$, smoothed", label="$\\mu$K")
+    mollweide(_fig3.add_subplot(1, 3, 2, projection="mollweide"), _b_spin, vmax=_vmax, title="(b) $B$ of pure $E$ after $\\mathcal{C}_{2\\to2}$", label="$\\mu$K")
+    mollweide(_fig3.add_subplot(1, 3, 3, projection="mollweide"), _b_comp, vmax=_vmax, title="(c) $B$ of pure $E$, $Q$ and $U$ smoothed as scalars", label="$\\mu$K")
+    mo.vstack([mo.as_html(_fig3), mo.md(r"""
+    **Figure 9.** The leakage of $E$ into $B$ when the polarisation is smoothed.  From left to right, each shown as colour in μK on a common diverging scale: (a) the simulated lensing $B$ mode smoothed by a Gaussian of width $6/L$ radians, with an rms of %.2g μK; (b) the $B$ mode of the polarisation of the $E$ mode alone, smoothed in the same way by the spin-2 convolution $\mathcal{C}_{2\to2}$, which vanishes to an rms of %.0e μK; and (c) the $B$ mode of the same polarisation with $Q$ and $U$ smoothed as scalar fields, with an rms of %.2g μK, %.0f times that of the lensing $B$ mode.  The spurious $B$ mode of (c) is largest around the poles of the coordinates, where the frame turns fastest.
+    """ % (rms(_b_lens), rms(_b_spin), rms(_b_comp), rms(_b_comp) / rms(_b_lens)))])
     return
 
 
@@ -658,9 +716,9 @@ def _():
     mo.md(r"""
     ## 7. Weak gravitational lensing: mass mapping (spin 2 → 0)
 
-    Light from distant galaxies is deflected by the matter along the line of sight, which shears their images.  The convergence $\kappa$, the projected mass density, is a scalar field, and the shear $\gamma$ is the spin-2 field $\gamma=\mathcal{C}_{0\to2}[\mathcal{D}]\kappa$ with $\mathcal{D}_\ell=-\sqrt{(\ell+2)(\ell-1)/(\ell(\ell+1))}$ (Proposition VI.8(c)), whose sticks are tangential around mass concentrations.  The simulated convergence is a shifted lognormal field (Hilbert *et al.* 2011) with a realistic power spectrum: the Limber integral of the non-linear matter power spectrum of CAMB (Lewis *et al.* 2000; HMcode, Mead *et al.* 2021) for the Planck 2018 cosmology and a Euclid-like distribution of source galaxies with median redshift 0.9.
+    The images of distant galaxies are distorted by the gravitational deflection of their light by the matter along the line of sight.  The convergence $\kappa$, the projected density of matter weighted by the geometry of the lensing, is a scalar field, and the shear $\gamma$, the anisotropic stretching of the images, is the spin-2 field $\gamma=\mathcal{C}_{0\to2}[\mathcal{D}]\kappa$ with $\mathcal{D}_\ell=-\sqrt{(\ell+2)(\ell-1)/(\ell(\ell+1))}$ (Proposition VI.8(c) of the article), which stretches the images tangentially around concentrations of mass.  We simulate the convergence as a shifted lognormal field (Hilbert *et al.* 2011), which captures the skewness of the distribution of matter, with a realistic power spectrum: the Limber integral of the non-linear matter power spectrum computed by CAMB (Lewis *et al.* 2000) with HMcode (Mead *et al.* 2021) for the Planck 2018 cosmology, for a Euclid-like distribution of source galaxies with median redshift 0.9.
 
-    The shear measured from galaxy shapes carries shape noise, here white with a dispersion of $0.26$ per component and a density of galaxies set by the slider.  The spherical Kaiser–Squires estimator $\mathcal{C}_{2\to0}[\mathcal{D}^{-1}]$ (Kaiser & Squires 1993; Wallis *et al.* 2022) recovers $\kappa_E+\mathrm{i}\kappa_B$ from the noisy shear in one step on the full sphere, without the flat-sky approximation of the original method: $\kappa_E$ estimates the convergence and $\kappa_B$, which lensing does not produce, is a null test that contains only noise.  All maps are smoothed by the same axisymmetric Gaussian convolution.
+    The shear is measured from the shapes of galaxies, whose intrinsic ellipticities add shape noise, which we model as white noise with a dispersion of 0.26 per component for the density of galaxies set by the slider.  The spherical Kaiser–Squires estimator $\mathcal{C}_{2\to0}[\mathcal{D}^{-1}]$ (Kaiser & Squires 1993; Wallis *et al.* 2022) recovers $\kappa_E+\mathrm{i}\kappa_B$ from the noisy shear in a single operation on the full sphere, without the planar approximation of the original method.  The real part $\kappa_E$ estimates the convergence, while the imaginary part $\kappa_B$, which lensing does not produce, contains only noise and so serves as a null test.  We smooth all maps with the same axisymmetric Gaussian convolution to suppress the noise on small scales.
     """)
     return
 
@@ -687,15 +745,16 @@ def _(L, ngal_ui):
     _r = np.real(np.vdot(_kT, _kE)) / np.sqrt(np.real(np.vdot(_kT, _kT) * np.vdot(_kE, _kE)))
     _vmax = float(np.max(np.abs(field_grid(_kT)[0])))
 
-    _fig = Figure(figsize=(13, 7.4), layout="constrained")
-    mollweide(_fig.add_subplot(2, 3, 1, projection="mollweide"), _kappa, title="simulated convergence $\\kappa$")
-    orthographic(_fig.add_subplot(2, 3, 2), _kappa, 0, glyph_flm=_gamma, glyph_s=2, title="$\\kappa$ with its shear $\\gamma=\\mathcal{C}_{0\\to2}[\\mathcal{D}]\\kappa$")
-    orthographic(_fig.add_subplot(2, 3, 3), _kappa, 0, glyph_flm=_gamma_obs, glyph_s=2, title="$\\kappa$ with the noisy shear")
-    mollweide(_fig.add_subplot(2, 3, 4, projection="mollweide"), _kT, vmax=_vmax, title="$\\kappa$, smoothed")
-    mollweide(_fig.add_subplot(2, 3, 5, projection="mollweide"), _kE, vmax=_vmax, title=f"Kaiser–Squires $\\kappa_E$, smoothed: correlation {_r:.2f} with $\\kappa$")
-    mollweide(_fig.add_subplot(2, 3, 6, projection="mollweide"), _kB, vmax=_vmax, title="Kaiser–Squires $\\kappa_B$, smoothed: noise")
-    _fig.suptitle("Mass mapping from a noisy shear field by lifted convolutions $\\mathcal{C}_{0\\to2}$ and $\\mathcal{C}_{2\\to0}$", fontsize=10)
-    _fig
+    _fig = Figure(figsize=(13, 8.4), layout="constrained")
+    mollweide(_fig.add_subplot(2, 3, 1, projection="mollweide"), _kappa, title="(a) simulated convergence $\\kappa$", label="dimensionless")
+    orthographic(_fig.add_subplot(2, 3, 2), _kappa, 0, glyph_flm=_gamma, glyph_s=2, title="(b) $\\kappa$ and its shear $\\gamma$", label="dimensionless")
+    orthographic(_fig.add_subplot(2, 3, 3), _kappa, 0, glyph_flm=_gamma_obs, glyph_s=2, title="(c) $\\kappa$ and the noisy shear", label="dimensionless")
+    mollweide(_fig.add_subplot(2, 3, 4, projection="mollweide"), _kT, vmax=_vmax, title="(d) $\\kappa$, smoothed", label="dimensionless")
+    mollweide(_fig.add_subplot(2, 3, 5, projection="mollweide"), _kE, vmax=_vmax, title="(e) Kaiser–Squires $\\kappa_E$, smoothed", label="dimensionless")
+    mollweide(_fig.add_subplot(2, 3, 6, projection="mollweide"), _kB, vmax=_vmax, title="(f) Kaiser–Squires $\\kappa_B$, smoothed", label="dimensionless")
+    mo.vstack([mo.as_html(_fig), mo.md(r"""
+    **Figure 10.** Mass mapping from a noisy shear field by the lifted convolutions $\mathcal{C}_{0\to2}$ and $\mathcal{C}_{2\to0}$.  Top: (a) the simulated convergence $\kappa$, shown as colour on a diverging scale, red for overdense and blue for underdense regions; (b) an orthographic view, centred on 20°N, 34°E in the coordinates of the simulation, of $\kappa$ shown as colour as in (a), with the shear $\gamma=\mathcal{C}_{0\to2}[\mathcal{D}]\kappa$ drawn as headless sticks along the direction in which the images are stretched, at the angle $\arg(\gamma)/2$, whose lengths grow in proportion to $|\gamma|$ from 35 per cent of the largest length; and (c) the same view with the shear including shape noise, for %.1f galaxies per arcmin$^2$, drawn as sticks.  Bottom, each shown as colour on the diverging scale of (d): (d) the convergence smoothed by an axisymmetric Gaussian convolution of width $3/L$ radians; (e) the Kaiser–Squires estimate $\kappa_E$ from the noisy shear, smoothed in the same way, whose correlation coefficient with (d) is %.2f; and (f) the smoothed $\kappa_B$, which contains only noise.  The sticks of the shear are tangential around the overdense regions and radial around the underdense regions, and the shape noise randomises them on small scales, while the smoothed estimate $\kappa_E$ recovers the structures of the convergence on large scales.
+    """ % (ngal_ui.value, _r))])
     return
 
 
@@ -714,7 +773,7 @@ def _():
     mo.md(r"""
     ## Summary
 
-    Every example applies lifted convolutions $\mathcal{C}_{s\to s'}$ whose input and output spins are those of the physical quantities: derivatives raise or lower the spin ($\eth$, $\bar\eth$, and their compositions such as the Vening Meinesz and Kaiser–Squires operators), smoothing and continuation preserve it, and the directional ridge detector maps a scalar to the tuple of spins that makes up a function on the rotation group.  Each is a single multiplier of the harmonic coefficients, exact for band-limited fields, invertible where the physics allows, and rotation-equivariant, so that the results do not depend on the choice of coordinates.  The comparisons with component-wise processing in Secs 4 and 6 show the errors the spin formalism removes: a distorted flow around the poles and a leakage of $E$ into $B$ larger than the lensing $B$ mode.
+    In each example we have applied lifted convolutions $\mathcal{C}_{s\to s'}$ whose input and output spins are those of the physical quantities concerned.  Derivatives raise or lower the spin, as do their compositions, such as the formula of Vening Meinesz and the Kaiser–Squires relation; smoothing and the continuation of potential fields preserve it; and the steerable ridge detector maps a scalar field to the tuple of spin fields that makes up a function on the rotation group.  Each operator is a single multiplier of the harmonic coefficients, computed exactly and efficiently for band-limited fields, invertible where the physics allows, and rotation-equivariant, so that its result does not depend on the choice of coordinates.  The comparisons with the processing of the components of spin fields as scalar fields show the errors that the spin formalism removes: a flow destroyed around the poles of the coordinates, and a leakage of $E$ into $B$ that exceeds the $B$ mode generated by lensing.
     """)
     return
 
