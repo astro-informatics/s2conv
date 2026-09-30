@@ -11,11 +11,8 @@ app = marimo.App(width="medium", app_title="Lifted spherical convolutions")
 with app.setup:
     # Imports and numerical configuration shared by every cell and function below.
     import functools
-    import io
     import os
     import time
-    import urllib.request
-    from pathlib import Path
 
     os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")  # allocate GPU memory as needed
 
@@ -48,7 +45,6 @@ with app.setup:
     TOL = 1e-10  # a check passes when its relative error is below TOL
     N_EQ_FIELDS = 10  # random input fields per equivariance test (100 in Cobb et al., 20 in Ocampo et al.)
     N_EQ_ROTATIONS = 10  # Haar-random rotations per equivariance test (likewise 100 and 20)
-    R_EARTH = 6.371e6  # radius of the Earth in metres, for the wind and ocean currents of Sec. 13
 
     # The equivariance tests call these s2conv functions thousands of times on small arrays, so they use them
     # JIT compiled: each call then runs as one compiled program rather than as a sequence of array operations.
@@ -80,7 +76,7 @@ def _():
     * against a **literal evaluation**, in which fields are lifted on a sampling of $\mathrm{SO}(3)$, Wigner transformed, convolved and projected back by quadrature along the fibre;
     * against the **real-space definitions** of the classical convolutions (Definitions III.1–III.10), evaluated by exact quadrature with explicit rotations, including the spin phase of Eq. (12).
 
-    The operators, kernels, transforms and utilities all come from s2conv; the notebook itself writes out only these independent evaluations, the test fields and the figures.
+    The operators, kernels, transforms and utilities all come from s2conv; the notebook itself writes out only these independent evaluations, the test fields and the figures.  The companion notebook `real_fields.py` applies the operators to fields measured on the Earth and on the sky: topography, gravity, the geomagnetic field, wind, ocean currents, the polarisation of the cosmic microwave background and weak-lensing shear.
 
     Each table reports the maximum relative error of a check, except the equivariance table of Sec. 12, which reports the mean relative $L^2$ error of Cobb *et al.* (2021) and Ocampo *et al.* (2023).  A ✅ marks agreement to better than $10^{-10}$ or, for an operator that the article says should *not* agree (a non-equivariant operator, for instance), a clear disagreement.  Equation, definition, theorem, figure and table numbers refer to the article.
     """)
@@ -1625,175 +1621,7 @@ def _(L, N_DIR, eq_op_ui, f_bars, ridge_lm):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## 13. Real fields
-
-    The operators apply to any band-limited field, and the fields of geophysics and cosmology are natural inputs.  This section applies them to four fields, stored as harmonic coefficients at band-limit $64$ in `notebooks/data` and truncated to the demonstration band-limit $L$, the geophysical fields with a Gaussian taper $e^{-\ell(\ell+1)/L^2}$ that keeps the ringing at coastlines and jets small (`notebooks/data/README.md` gives their sources and licences and how they are made):
-
-    * the Earth's topography and bathymetry, a scalar field (ETOPO 2022, NOAA National Centers for Environmental Information);
-    * the near-surface wind in January, averaged over 1991–2020, a spin-1 field (NCEP/NCAR reanalysis, Kalnay *et al.* 1996);
-    * the ocean surface currents in 2025, a spin-1 field (GODAS, Behringer & Xue 2004);
-    * a simulated weak-lensing convergence field $\kappa$ and its shear, a scalar and a spin-2 field.
-
-    A tangent vector field with components $v_\theta$ and $v_\varphi$ is the spin-1 field ${}_1f=v_\theta+\mathrm{i}v_\varphi$, so that a wind with northward and eastward components $(v,u)$ is ${}_1f=-v+\mathrm{i}u$ and is drawn with arrows.  The section has figures only and no checks.
-    """)
-    return
-
-
-@app.function
-def example_field(name, L, taper=True):
-    """Harmonic coefficients of an example field of Sec. 13, truncated to band-limit L, and its spin.  The file is read
-    from notebooks/data, or downloaded from the repository on GitHub when the notebook runs without it.  With taper,
-    the coefficients are multiplied by the Gaussian exp(-l(l+1) / L^2), which falls to 0.37 at l = L and keeps the
-    ringing of the truncation at sharp features (coastlines, jets) small."""
-    path = Path(mo.notebook_dir() or ".") / "data" / f"{name}.npz"
-    if path.exists():
-        data = np.load(path)
-    else:
-        url = f"https://raw.githubusercontent.com/astro-informatics/s2conv/main/notebooks/data/{name}.npz"
-        with urllib.request.urlopen(url) as response:
-            data = np.load(io.BytesIO(response.read()))
-    flm, L_data = data["flm"].astype(np.complex128), int(data["L"])
-    if L > L_data:
-        raise ValueError(f"the example fields are stored at band-limit {L_data}, below L = {L}")
-    el = np.arange(L)
-    window = np.exp(-el * (el + 1) / L**2) if taper else np.ones(L)
-    return flm[:L, L_data - L : L_data + L - 1] * window[:, None], int(data["spin"])
-
-
-@app.cell(hide_code=True)
-def _():
-    mo.md(r"""
-    **Topography.**  An axisymmetric Gaussian convolution smooths the topography.  The steerable ridge detector $\psi$ of Sec. 4 then finds mountain ranges, in the land elevation $f_+=\max(f,0)$, since the step of several kilometres at the continental margins would otherwise dominate its response.  Its directional convolution with the land elevation, computed as the tuple of spin-changing convolutions $\mathcal{C}_{0\to s'}[\Lambda_0\psi]f$, $|s'|<5$ (Proposition VI.6), gives the response at every orientation $\gamma$.  Its largest value over $\gamma$ marks ridges of the detector's width, and the spin-2 component ${}_2g=\mathcal{C}_{0\to2}[\Lambda_0\psi]f$, drawn as sticks, gives their direction.  The bars field of Sec. 4 is shown with the same analysis for comparison.
-    """)
-    return
-
-
-@app.cell
-def _(L, N_DIR, f_bars, ridge_lm):
-    def _ridges(_f):
-        """Largest ridge response over the orientations gamma, and the spin-2 orientation field."""
-        _comps = {_q: s2conv.lifted_convolution(_f, kernels.lifted(ridge_lm, 0), 0, _q) for _q in range(-(N_DIR - 1), N_DIR)}
-        _grids = {_q: np.asarray(field_grid(_c, _q)[0]) for _q, _c in _comps.items()}
-        _resp = np.max([sum(np.exp(-1j * _q * _g) * _x for _q, _x in _grids.items()).real
-                        for _g in np.linspace(0, np.pi, 36, endpoint=False)], axis=0) / np.sqrt(2 * np.pi)
-        return np.clip(_resp, 0, None), _comps[2]
-
-    _topo, _ = example_field("earth_topography", L)
-    _smooth = classical.axisymmetric_convolution(_topo, gaussian_axisymmetric(L, 4 / L), 0)
-    _grid, _ = field_grid(_topo, 0, 2 * L)  # clip at sea level on a finer grid, to keep the aliasing small
-    _land = np.asarray(transforms.forward(np.maximum(np.asarray(_grid).real, 0), 2 * L))[:L, L : 3 * L - 1]
-    _resp, _orient = _ridges(_land)
-    _resp_bars, _orient_bars = _ridges(f_bars)
-    _th, _ph = transforms.sphere_angles(128)
-
-    _fig = Figure(figsize=(13, 6.6), layout="constrained")
-    mollweide(_fig.add_subplot(2, 3, 1, projection="mollweide"), _topo, cmap="BrBG_r", title="topography and bathymetry $f$ (km)")
-    mollweide(_fig.add_subplot(2, 3, 2, projection="mollweide"), _smooth, cmap="BrBG_r", title="smoothed by an axisymmetric Gaussian convolution")
-    mollweide_grid(_fig.add_subplot(2, 3, 3, projection="mollweide"), _resp, _th, _ph, cmap="YlOrBr", symmetric=False,
-                   title="ridge strength $\\max_\\gamma\\,(f_+\\circledast\\psi)(\\cdot,\\gamma)$ of the land")
-    orthographic(_fig.add_subplot(2, 3, 4), _topo, 0, cmap="BrBG_r", lat0=np.radians(30), lon0=np.radians(85), glyph_flm=_orient, glyph_s=2,
-                 title="Himalaya, with the orientation field ${}_2g$")
-    orthographic(_fig.add_subplot(2, 3, 5), _topo, 0, cmap="BrBG_r", lat0=np.radians(-15), lon0=np.radians(-65), glyph_flm=_orient, glyph_s=2,
-                 title="Andes, with ${}_2g$")
-    orthographic(_fig.add_subplot(2, 3, 6), f_bars, 0, lat0=0.2, lon0=2.4, glyph_flm=_orient_bars, glyph_s=2,
-                 title="bars field of Sec. 4, with its ${}_2g$")
-    _fig.suptitle("Directional analysis of the Earth's topography by lifted convolutions", fontsize=10)
-    _fig
-    return
-
-
-@app.cell(hide_code=True)
-def _():
-    mo.md(r"""
-    **Wind and ocean currents.**  The spin lowering operator is the lifted convolution $\bar\eth=\mathcal{C}_{1\to0}$ with the multiplier of Sec. 10, and for a spin-1 field it gives the divergence and the vorticity (the radial component of the curl) together: $\bar\eth\,{}_1f=-(\nabla\cdot v+\mathrm{i}\,\hat r\cdot\nabla\times v)$, divided by the Earth's radius for the physical units.  Since $\eth\bar\eth$ is the Laplacian on spin-1 fields, applying $\eth\,\nabla^{-2}=\mathcal{C}_{0\to1}$ to the real and imaginary parts separately splits the field into its curl-free and divergence-free parts, the Helmholtz decomposition, which sum to the field exactly.  A spin-preserving Gaussian multiplier $\mathcal{C}_{1\to1}$ smooths a vector field without mixing its components with the local frame.
-    """)
-    return
-
-
-@app.cell
-def _(L):
-    def _helmholtz(_f):
-        """div + i curl of a spin-1 field in 1/s, as coefficients of its real and imaginary parts, and the curl-free
-        and divergence-free parts of the field, from eth-bar f = -R (div + i curl) and f = eth lap^{-1} eth-bar f."""
-        _g = -physics.ethbar(_f, 1) / R_EARTH
-        _el = np.arange(_f.shape[0])
-        _inv_lap = np.where(_el > 0, -1 / np.maximum(_el * (_el + 1), 1), 0.0)[:, None]
-        _g_div, _g_curl = (_g + conjugate(_g, 0)) / 2, (_g - conjugate(_g, 0)) / 2
-        return _g_div, _g_curl, -R_EARTH * physics.eth(_inv_lap * _g_div, 0), -R_EARTH * physics.eth(_inv_lap * _g_curl, 0)
-
-    _wind, _ = example_field("wind", L)
-    _div, _curl, _wind_div, _wind_rot = _helmholtz(_wind)
-    _view = dict(lat0=np.radians(20), lon0=np.radians(-150))
-
-    _fig = Figure(figsize=(13, 6.6), layout="constrained")
-    mollweide(_fig.add_subplot(2, 3, 1, projection="mollweide"), _wind, 1, part="abs", title="January near-surface wind speed $|{}_1f|$")
-    orthographic(_fig.add_subplot(2, 3, 2), _wind, 1, part="abs", **_view, title="the wind ${}_1f$ over the Pacific")
-    mollweide(_fig.add_subplot(2, 3, 3, projection="mollweide"), _curl, part="imag", title="vorticity $-\\mathrm{Im}\\,\\bar\\eth\\,{}_1f$")
-    mollweide(_fig.add_subplot(2, 3, 4, projection="mollweide"), _div, part="real", title="divergence $-\\mathrm{Re}\\,\\bar\\eth\\,{}_1f$")
-    orthographic(_fig.add_subplot(2, 3, 5), _wind_rot, 1, part="abs", **_view, title="divergence-free part")
-    orthographic(_fig.add_subplot(2, 3, 6), _wind_div, 1, part="abs", **_view, title="curl-free part")
-    _fig.suptitle("Vorticity, divergence and Helmholtz decomposition of the wind by spin-changing lifted convolutions", fontsize=10)
-
-    _cur, _ = example_field("ocean_currents", L)
-    _, _cur_curl, _, _ = _helmholtz(_cur)
-    _el = np.arange(L)
-    _cur_smooth = s2conv.lifted_convolution(_cur, kernels.multiplier(np.exp(-0.5 * _el * (_el + 1) * (3 / L) ** 2), 1, 1), 1, 1)
-    _view = dict(lat0=np.radians(5), lon0=np.radians(-140))
-    _fig2 = Figure(figsize=(13, 3.5), layout="constrained")
-    mollweide(_fig2.add_subplot(1, 4, 1, projection="mollweide"), _cur, 1, part="abs", title="ocean surface current speed, 2025")
-    orthographic(_fig2.add_subplot(1, 4, 2), _cur, 1, part="abs", **_view, title="currents of the equatorial Pacific")
-    orthographic(_fig2.add_subplot(1, 4, 3), _cur_smooth, 1, part="abs", **_view, title="smoothed by a Gaussian $\\mathcal{C}_{1\\to1}$")
-    mollweide(_fig2.add_subplot(1, 4, 4, projection="mollweide"), _cur_curl, part="imag", title="vorticity of the currents")
-    mo.vstack([mo.as_html(_fig), mo.as_html(_fig2)])
-    return
-
-
-@app.cell(hide_code=True)
-def _():
-    mo.md(r"""
-    **Weak gravitational lensing.**  The convergence $\kappa$ is a shifted lognormal field with the Limber power spectrum of the linear matter power spectrum (Eisenstein & Hu 1998) for sources at redshift 1.  Its shear is the spin-2 field $\gamma=\mathcal{C}_{0\to2}[\mathcal{D}]\kappa$ of Sec. 10, and the shear measured from galaxy shapes carries shape noise, here white with a dispersion of $0.26$ per component and a density of galaxies set by the slider.  The spherical Kaiser–Squires estimator $\mathcal{C}_{2\to0}[\mathcal{D}^{-1}]$ (Kaiser & Squires 1993; Wallis *et al.* 2022) recovers $\kappa_E+\mathrm{i}\kappa_B$ from the noisy shear: $\kappa_E$ estimates the convergence, and $\kappa_B$, which lensing does not produce, is pure noise.  All maps are smoothed by the same axisymmetric Gaussian convolution.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _():
-    ngal_ui = mo.ui.slider(steps=[0.1, 0.3, 1, 3, 10, 30], value=1, show_value=True, label="galaxies per arcmin$^2$")
-    ngal_ui
-    return (ngal_ui,)
-
-
-@app.cell
-def _(L, ngal_ui, seed):
-    _kappa, _ = example_field("convergence", L, taper=False)
-    _gamma = physics.kaiser_squires(_kappa)
-    _rng = np.random.default_rng(seed + 14)
-    _N = 0.26**2 / (ngal_ui.value / (np.pi / 10800) ** 2)  # noise power of each of the E and B modes
-    _noise = np.sqrt(_N) * (_rng.standard_normal((L, 2 * L - 1)) + 1j * _rng.standard_normal((L, 2 * L - 1))) * lm_mask(L, 2)
-    _gamma_obs = _gamma + _noise
-    _k = physics.kaiser_squires_inverse(_gamma_obs)
-    _beam = gaussian_axisymmetric(L, 3 / L)
-    _smooth = lambda _x: classical.axisymmetric_convolution(_x, _beam, 0)
-    _kE, _kB, _kT = _smooth((_k + conjugate(_k, 0)) / 2), _smooth((_k - conjugate(_k, 0)) / 2j), _smooth(_kappa)
-    _r = np.real(np.vdot(_kT, _kE)) / np.sqrt(np.real(np.vdot(_kT, _kT) * np.vdot(_kE, _kE)))
-    _vmax = float(np.max(np.abs(field_grid(_kT)[0])))
-
-    _fig = Figure(figsize=(13, 6.6), layout="constrained")
-    mollweide(_fig.add_subplot(2, 3, 1, projection="mollweide"), _kappa, title="simulated convergence $\\kappa$")
-    orthographic(_fig.add_subplot(2, 3, 2), _kappa, 0, glyph_flm=_gamma, glyph_s=2, title="$\\kappa$ with its shear $\\gamma=\\mathcal{C}_{0\\to2}[\\mathcal{D}]\\kappa$")
-    orthographic(_fig.add_subplot(2, 3, 3), _kappa, 0, glyph_flm=_gamma_obs, glyph_s=2, title="$\\kappa$ with the noisy shear")
-    mollweide(_fig.add_subplot(2, 3, 4, projection="mollweide"), _kT, vmax=_vmax, title="$\\kappa$, smoothed")
-    mollweide(_fig.add_subplot(2, 3, 5, projection="mollweide"), _kE, vmax=_vmax, title=f"Kaiser–Squires $\\kappa_E$, smoothed: correlation {_r:.2f} with $\\kappa$")
-    mollweide(_fig.add_subplot(2, 3, 6, projection="mollweide"), _kB, vmax=_vmax, title="Kaiser–Squires $\\kappa_B$, smoothed: noise")
-    _fig.suptitle("Mass mapping from a noisy shear field by lifted convolutions $\\mathcal{C}_{0\\to2}$ and $\\mathcal{C}_{2\\to0}$", fontsize=10)
-    _fig
-    return
-
-
-@app.cell(hide_code=True)
-def _():
-    mo.md(r"""
-    ## 14. Summary
+    ## 13. Summary
 
     The table collects every check in the notebook.  Each row of Tables I and II of the article, and each construction of Sec. VII, is covered above by one or more checks.
     """)
@@ -1831,7 +1659,7 @@ def _(axisym_rows, beyond_rows, conventions_rows, directional_rows, equivariance
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## 15. Cost (Sec. VIII, Table III)
+    ## 14. Cost (Sec. VIII, Table III)
 
     The operators cost what the part of the kernel they read implies: $\mathcal{O}(L^3)$ for $\mathcal{C}_{s\to s'}$, which needs one forward and one inverse spin transform; $\mathcal{O}(NL^3)$ for $\mathcal{C}_{s\to G}$ with a steerable kernel; and $\mathcal{O}(NL^3+N^2L^2)$ for a group convolution with input and kernel restricted to orders $|n|<N$, which becomes $\mathcal{O}(L^4)$ when $N=L$.  The JAX backend keeps $N<8$, so the timing below fixes $N\le5$: every operator then scales as $L^3$, with a prefactor set by the part of the kernel it reads.  Each transform is compiled on its first call, which the timing excludes.  The timing is optional, since it runs transforms up to $L=128$.
     """)
