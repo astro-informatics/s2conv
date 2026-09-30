@@ -1,0 +1,71 @@
+name: Build (and upload to PyPI for published releases)
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+  release:
+    types:
+      - published
+
+jobs:
+  build:
+    name: Build source distribution and wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.3
+        with:
+          # setuptools-scm needs the full history and the tags to determine the version
+          fetch-depth: 0
+          fetch-tags: true
+
+      # s2conv is pure Python, so a single wheel serves every platform
+      - name: Build sdist and wheel
+        run: pipx run build
+
+      - name: Check distributions
+        run: pipx run twine check --strict dist/*
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+  upload_test_pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: test-pypi
+    permissions:
+      id-token: write
+    # Try publishing to Test PyPI first: a problem then stops the release before PyPI.
+    # Development versions from pushes to main are uploaded only while the repository
+    # is public, since an upload publishes the source.
+    if: |
+      (github.event_name == 'release' && github.event.action == 'published') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' && !github.event.repository.private)
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+      - name: Publish package distributions to Test PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  upload_pypi:
+    needs: [build, upload_test_pypi]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    if: github.event_name == 'release' && github.event.action == 'published'
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

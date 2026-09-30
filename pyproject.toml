@@ -47,6 +47,7 @@ requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENCE.txt"]
 urls.homepage = "https://github.com/astro-informatics/s2conv"
+urls.documentation = "https://astro-informatics.github.io/s2conv"
 urls.issues = "https://github.com/astro-informatics/s2conv/issues"
 
 [project.optional-dependencies]
