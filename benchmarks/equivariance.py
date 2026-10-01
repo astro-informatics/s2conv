@@ -477,8 +477,8 @@ def reduction_error(pairs) -> float:
     )
 
 
-def time_pipeline(spec: Spec, L: int, key, repeats: int) -> float:
-    """Median run time of the operator end to end, JIT compiled, compilation excluded."""
+def pipeline_times(spec: Spec, L: int, key, repeats: int) -> list:
+    """Run times of the operator end to end, JIT compiled, compilation excluded."""
     import jax
 
     from s2conv import transforms
@@ -496,7 +496,17 @@ def time_pipeline(spec: Spec, L: int, key, repeats: int) -> float:
         start = time.perf_counter()
         jax.block_until_ready(run(samples))
         times.append(time.perf_counter() - start)
+    return times
+
+
+def median(times: list) -> float:
+    """The median of the run times, the upper one of the middle two for an even number."""
     return sorted(times)[len(times) // 2]
+
+
+def time_pipeline(spec: Spec, L: int, key, repeats: int) -> float:
+    """Median run time of the operator end to end, JIT compiled, compilation excluded."""
+    return median(pipeline_times(spec, L, key, repeats))
 
 
 def system_info() -> dict:
@@ -551,15 +561,15 @@ def git_revision(file) -> dict | None:
         return None
 
 
-def code_revisions() -> dict:
-    """The git revisions of the code that runs: the s2conv package, this script and s2fft."""
+def code_revisions(script: str = __file__) -> dict:
+    """The git revisions of the code that runs: the s2conv package, the benchmark script and s2fft."""
     import s2fft
 
     import s2conv
 
     return {
         "s2conv": git_revision(s2conv.__file__),
-        "benchmark": git_revision(__file__),
+        "benchmark": git_revision(script),
         "s2fft": git_revision(s2fft.__file__),
     }
 
@@ -597,6 +607,12 @@ def warn_about_code(code: dict) -> None:
         print(
             f"warning: s2conv is imported from {s2conv_revision['repository']}, "
             f"not from the checkout of this script, {script['repository']}",
+            file=sys.stderr,
+        )
+    if script is None:
+        print(
+            "warning: the benchmark script is not tracked by git; the results do not record "
+            "its code",
             file=sys.stderr,
         )
     for name, revision in checkouts(code):

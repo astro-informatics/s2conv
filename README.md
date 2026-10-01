@@ -138,6 +138,12 @@ python benchmarks/equivariance.py -L 16 32 64 -o equivariance.json --latex equiv
 
 In double precision the equivariant operators give errors of about 10⁻¹⁵ (about 2 × 10⁻⁷ in single precision), while the section-evaluated and harmonic-diagonal operators give errors of order one.  The [user guide](https://astro-informatics.github.io/s2conv/user_guide/equivariance.html) has the details.
 
+The script `benchmarks/scaling.py` times the four lifted convolutions against band-limit L, with the azimuthal band-limit N fixed, on one CPU core, and plots the times against an L³ reference, the scaling of their transforms ([user guide](https://astro-informatics.github.io/s2conv/user_guide/scaling.html)):
+
+```bash
+python benchmarks/scaling.py -o scaling.json --plot scaling.pdf > scaling.md
+```
+
 ## Tests 🚦
 
 ```bash
