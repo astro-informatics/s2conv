@@ -41,6 +41,9 @@ with app.setup:
     R_CORE = 3.485e6  # radius of the core-mantle boundary (m)
     ARCSEC = 180 * 3600 / np.pi  # arcseconds per radian
     matplotlib.rcParams["figure.dpi"] = 72  # marimo renders at twice this: keeps the largest figures within its output limit
+    # print mode, switched on by export_real_fields_figures.py: figures at the text width of the article, 8 pt text,
+    # panel titles reduced to their letters, and the figures and captions collected for export
+    PRINT = dict(on=False, width=6.5, figures={}, captions={})
 
 
 @app.cell(hide_code=True)
@@ -112,7 +115,7 @@ def _(L):
     _p, _ = example_field("cmb_planck_polarisation", L, taper=False)
     _kappa, _ = example_field("convergence", L, taper=False)
     _gamma = physics.kaiser_squires(_kappa)  # C_{0->2}
-    _fig = Figure(figsize=(14, 6.2), layout="constrained")
+    _fig = new_figure(14, 6.2, "01_overview")
     _grid = _fig.add_gridspec(2, 8)
     _axes = [_fig.add_subplot(_grid[0, 2 * _i : 2 * _i + 2], projection="mollweide") for _i in range(4)]
     _axes += [_fig.add_subplot(_grid[1, 2 * _i + 1 : 2 * _i + 3], projection="mollweide") for _i in range(3)]
@@ -129,7 +132,7 @@ def _(L):
     mollweide_glyphs(_axes[5], apply(_p, _g4, 2, 2), 2, n_glyph=500)
     mollweide(_axes[6], _kappa * _g8[:, None], title="(g) lensing convergence (spin 0) and shear (spin 2)", label="dimensionless")
     mollweide_glyphs(_axes[6], _gamma * _g8[:, None], 2, n_glyph=500)
-    mo.vstack([mo.as_html(_fig), mo.md(r"""
+    mo.vstack([mo.as_html(_fig), caption("01_overview", r"""
     **Figure 1.** Fields of spin 0, 1 and 2 on the Earth and on the sky, the examples of this notebook.  Top, from left to right: (a) the height of the land and the depth of the ocean floor, a scalar field, shown as colour in km, brown above and green below sea level; (b) the deflection of the vertical, the small angle, of a few arcseconds, by which the direction of gravity, i.e. of a plumb line, differs from the vertical of an idealised smooth Earth because of the uneven distribution of mass within the Earth, a spin-1 field, with its size shown as colour and its direction drawn as arrows; (c) the horizontal part of the Earth's magnetic field in 2025, the field that aligns a compass needle, a spin-1 field, with its strength shown as colour in μT and its direction drawn as arrows; (d) the wind near the surface in January, averaged over thirty years, a spin-1 field, with the wind speed shown as colour and the direction in which the wind blows drawn as arrows.  Bottom: (e) the currents at the surface of the ocean in 2025, a spin-1 field, with their speed shown as colour and the direction in which the water flows drawn as arrows, whose lengths are proportional to the speed; (f) the cosmic microwave background, the light emitted by the early Universe, as measured by the Planck satellite, with the variations of its temperature, a scalar field, shown as colour in μK, and the direction of its polarisation, a spin-2 field, drawn as headless sticks, in coordinates in which the plane of our Galaxy lies along the equator of the map; and (g) a simulation of the weak gravitational lensing of distant galaxies by the matter in the Universe, with the projected density of matter, the convergence, a scalar field, shown as colour, red where it is higher and blue where it is lower than the mean, and the shear, the direction in which the images of the galaxies are stretched, a spin-2 field, drawn as headless sticks, which circle the concentrations of mass.  The fields of (f) and (g) are smoothed so that the sticks follow their large-scale patterns, and, unless stated otherwise, the lengths of the arrows and sticks grow with the size of the field.  The fields are described in detail, with the lifted convolutions that act on them, in Figs. 2 (topography), 3 (gravity), 4 (magnetic field), 5 (wind), 7 (ocean currents), 8 (CMB) and 9 (lensing).
     """)])
     return
@@ -295,13 +298,46 @@ def angles_of(v):
 
 
 @app.function
+def new_figure(width, height, name):
+    """A figure of the given size in inches, or, in print mode, at the text width of the article with its height
+    scaled alike, collected under name for export."""
+    if not PRINT["on"]:
+        return Figure(figsize=(width, height), layout="constrained")
+    fig = Figure(figsize=(PRINT["width"], height * PRINT["width"] / width), layout="constrained")
+    PRINT["figures"][name] = fig
+    return fig
+
+
+@app.function
+def caption(name, text):
+    """The caption of a figure as markdown, collected under name for export."""
+    PRINT["captions"][name] = text
+    return mo.md(text)
+
+
+@app.function
+def panel_title(ax, title):
+    """Set a panel title; in print mode only its letter, e.g. "(a)", which the caption describes."""
+    if PRINT["on"] and title.startswith("("):
+        title = title[: title.index(")") + 1]
+    ax.set_title(title, fontsize=8 if PRINT["on"] else 9)
+
+
+@app.function
+def glyph_count(n):
+    """Fewer glyphs in print mode, where the panels are about half as wide."""
+    return max(int(n * 0.45), 100) if PRINT["on"] else n
+
+
+@app.function
 def colour_bar(ax, image, label):
     """A horizontal colour bar beneath a panel, labelled with the quantity or its units."""
-    bar = ax.figure.colorbar(image, ax=ax, orientation="horizontal", shrink=0.7, aspect=30, pad=0.03)
+    bar = ax.figure.colorbar(image, ax=ax, orientation="horizontal", shrink=0.8 if PRINT["on"] else 0.7,
+                             aspect=25 if PRINT["on"] else 30, pad=0.03)
     bar.set_label(label, fontsize=8)
-    bar.locator = matplotlib.ticker.MaxNLocator(nbins=6, symmetric=bool(image.norm.vmin < 0))
+    bar.locator = matplotlib.ticker.MaxNLocator(nbins=4 if PRINT["on"] else 6, symmetric=bool(image.norm.vmin < 0))
     bar.update_ticks()
-    bar.ax.tick_params(labelsize=7)
+    bar.ax.tick_params(labelsize=8 if PRINT["on"] else 7)
 
 
 @app.function
@@ -322,12 +358,12 @@ def mollweide_grid(ax, data, thetas, phis, cmap="RdBu_r", vmax=None, symmetric=T
     if coast:
         c_lon, c_lat = coastline()
         jump = np.abs(np.diff(c_lon, prepend=c_lon[0])) > np.pi  # break the lines where they cross the map's edge
-        ax.plot(np.where(jump, np.nan, c_lon), c_lat, color="0.15", lw=0.5)
+        ax.plot(np.where(jump, np.nan, c_lon), c_lat, color="0.15", lw=0.3 if PRINT["on"] else 0.5)
     ax.set_xticks([])
     ax.set_yticks([])
     ax.grid(False)
     if title:
-        ax.set_title(title, fontsize=9)
+        panel_title(ax, title)
     if label:
         colour_bar(ax, image, label)
     return image
@@ -349,6 +385,7 @@ def mollweide_glyphs(ax, flm, s, n_glyph=700, size=0.022, color="k", lat_max=np.
     points.  The direction on
     the map is that of a short step along the glyph, mapped by the projection, so that the angle of each glyph to the
     meridian is that on the sphere."""
+    n_glyph = glyph_count(n_glyph)
     k = np.arange(n_glyph) + 0.5
     theta = np.arccos(1 - 2 * k / n_glyph)
     phi = np.mod(np.pi * (1 + 5**0.5) * k, 2 * np.pi)
@@ -361,10 +398,11 @@ def mollweide_glyphs(ax, flm, s, n_glyph=700, size=0.022, color="k", lat_max=np.
     start = ax.transData.transform(np.stack([lon, lat], -1))
     end = ax.transData.transform(np.stack([lon + step * np.sin(angle) / np.cos(lat), lat - step * np.cos(angle)], -1))
     screen = np.arctan2(*(end - start)[:, ::-1].T)
-    length = size * (floor + (1 - floor) * np.abs(z) / np.max(np.abs(z)))
+    scale = 2.0 if PRINT["on"] else 1.0  # the panels are about half as wide in print
+    length = scale * size * (floor + (1 - floor) * np.abs(z) / np.max(np.abs(z)))
     head = dict(headwidth=3.5, headlength=4, headaxislength=3.5) if abs(s) == 1 else dict(headwidth=0, headlength=0, headaxislength=0)
     ax.quiver(lon, lat, length * np.cos(screen), length * np.sin(screen), angles="uv", scale_units="width", scale=1,
-              pivot="middle", color=color, width=0.0022, **head)
+              pivot="middle", color=color, width=scale * 0.0022, **head)
 
 
 @app.function
@@ -403,9 +441,10 @@ def orthographic(ax, flm, s=0, part="real", cmap=None, lat0=0.35, lon0=0.6, glyp
         c_lon, c_lat = coastline()
         xyz = unit_vector(np.pi / 2 - c_lat, c_lon) @ V
         xyz[xyz[:, 2] < 0] = np.nan  # the far side
-        ax.plot(xyz[:, 0], xyz[:, 1], color="0.15", lw=0.6)
+        ax.plot(xyz[:, 0], xyz[:, 1], color="0.15", lw=0.35 if PRINT["on"] else 0.6)
     gflm, gs = (flm, s) if glyph_flm is None else (glyph_flm, glyph_s)
     if gs:
+        n_glyph = glyph_count(n_glyph)
         k = np.arange(n_glyph) + 0.5
         zc = 1 - 2 * k / n_glyph
         az = np.pi * (1 + 5**0.5) * k
@@ -431,7 +470,7 @@ def orthographic(ax, flm, s=0, part="real", cmap=None, lat0=0.35, lon0=0.6, glyp
     ax.set_aspect("equal")
     ax.axis("off")
     if title:
-        ax.set_title(title, fontsize=9)
+        panel_title(ax, title)
     if label:
         colour_bar(ax, image, label)
     return image
@@ -465,7 +504,7 @@ def _(L):
                         for _g in np.linspace(0, np.pi, 36, endpoint=False)], axis=0) / np.sqrt(2 * np.pi)
     _th, _ph = transforms.sphere_angles(128)
 
-    _fig = Figure(figsize=(13, 8.4), layout="constrained")
+    _fig = new_figure(13, 8.4, "02_topography")
     mollweide(_fig.add_subplot(2, 3, 1, projection="mollweide"), _topo, cmap="BrBG_r", coast=True, title="(a) topography and bathymetry $f$", label="km")
     _ax = _fig.add_subplot(2, 3, 2, projection="mollweide")
     mollweide(_ax, _downhill, 1, part="abs", cmap="YlOrBr", coast=True, title="(b) slope of the land and downhill direction $\\eth f_+$", label="m/km")
@@ -479,7 +518,7 @@ def _(L):
                  title="(e) Himalaya: ridge orientation ${}_2g$", label="arbitrary units")
     orthographic(_fig.add_subplot(2, 3, 6), _comps[2], 2, part="abs", cmap="YlOrBr", lat0=np.radians(-20), lon0=np.radians(-68), coast=True, glyph_floor=0.1,
                  title="(f) Andes: ridge orientation ${}_2g$", label="arbitrary units")
-    mo.vstack([mo.as_html(_fig), mo.md(r"""
+    mo.vstack([mo.as_html(_fig), caption("02_topography", r"""
     **Figure 2.** The topography of the Earth, its slope and its ridges, from lifted convolutions of spin 0 to spin 1 and to spin 2.  Top, from left to right: (a) the topography and bathymetry $f$, shown as colour in km on a diverging scale, brown above and green below sea level; (b) the slope of the land $|\eth f_+|/R_\oplus$, shown as colour in metres per kilometre, with the spin-1 field $\eth f_+$ drawn as arrows pointing downhill, whose lengths are proportional to the slope; (c) the ridge strength $\max_\gamma(f_+\circledast\psi)(\cdot,\gamma)$, the largest response of the ridge detector over all orientations, shown as colour on a sequential scale in arbitrary units.  Bottom: orthographic views of (d) the Himalaya and the Tibetan Plateau, centred on 32°N, 85°E, with the land elevation $f_+$ shown as colour in km and the downhill arrows of (b); (e) the same view, with the modulus of the ridge orientation field $|{}_2g|$ shown as colour and ${}_2g$ drawn as headless sticks at the angle $\arg({}_2g)/2$, whose lengths grow in proportion to $|{}_2g|$ from a tenth of the largest length; and (f) the same for the Andes, centred on 20°S, 68°W.  The arrows run down the flanks of the plateau, the ridge strength picks out the Himalaya, the Andes, the Rocky Mountains, the highlands of East Africa and the ice sheets of Greenland and Antarctica, and where the ridge strength is large the sticks lie along the ranges, from east to west along the Himalaya and from north to south along the Andes.
     """)])
     return
@@ -510,7 +549,7 @@ def _(L):
     _N_from_grad = apply(_grad * 2 * R_EARTH**2 / (GAMMA * 1e9), _inv, 2, 0)  # C_{2->0}
     _errs = (l2_rel(_eps_vm, _eps), l2_rel(_N_from_eps, _N), l2_rel(_N_from_grad, _N))
 
-    _fig = Figure(figsize=(13, 8.4), layout="constrained")
+    _fig = new_figure(13, 8.4, "03_gravity")
     mollweide(_fig.add_subplot(2, 3, 1, projection="mollweide"), _N, coast=True, title="(a) geoid height $N$", label="m")
     mollweide(_fig.add_subplot(2, 3, 2, projection="mollweide"), _dg, coast=True, vmax=robust_vmax(_dg), title="(b) gravity anomaly $\\Delta g=\\mathcal{C}_{0\\to0}N$", label="mGal")
     _ax = _fig.add_subplot(2, 3, 3, projection="mollweide")
@@ -522,7 +561,7 @@ def _(L):
                  title="(e) Andes: gravity gradients $\\Gamma=\\mathcal{C}_{0\\to2}N$", label="E")
     orthographic(_fig.add_subplot(2, 3, 6), _N_from_eps, 0, lat0=np.radians(-5), lon0=np.radians(140), coast=True,
                  title="(f) New Guinea: $N$ recovered from $\\varepsilon$ by $\\mathcal{C}_{1\\to0}$", label="m")
-    mo.vstack([mo.as_html(_fig), mo.md(r"""
+    mo.vstack([mo.as_html(_fig), caption("03_gravity", r"""
     **Figure 3.** The gravity field of the Earth from EGM2008, as fields of spin 0, 1 and 2 related by lifted convolutions.  Top, from left to right: (a) the geoid height $N$, shown as colour in metres on a diverging scale, red above and blue below the reference ellipsoid; (b) the gravity anomaly $\Delta g=\mathcal{C}_{0\to0}N$, shown as colour in mGal ($10^{-5}$ m s$^{-2}$) on a diverging scale saturated at the 99.5th percentile of its modulus; (c) the modulus of the deflection of the vertical $\varepsilon=\mathcal{C}_{0\to1}N$, shown as colour in arcseconds, with $\varepsilon$ drawn as arrows, which point down the slope of the geoid and whose lengths grow in proportion to $|\varepsilon|$ from 35 per cent of the largest length.  Bottom, orthographic views: (d) the Indian Ocean, centred on 5°S, 80°E, with $N$ shown as colour in metres and $\varepsilon$ drawn as arrows as in (c); (e) the Andes, centred on 20°S, 75°W, with the modulus of the gravity gradients $\Gamma=\mathcal{C}_{0\to2}N$ shown as colour in Eötvös ($10^{-9}$ s$^{-2}$) and $\Gamma$ drawn as headless sticks along the horizontal direction in which the second derivative of the disturbing potential is largest, whose lengths grow in proportion to $|\Gamma|$ from 35 per cent of the largest length; and (f) Indonesia and New Guinea, centred on 5°S, 140°E, with the geoid height recovered from the deflections of the vertical by $\mathcal{C}_{1\to0}$ shown as colour in metres.  The deflections point into the geoid low of the Indian Ocean and away from the geoid high over New Guinea, and the gradients are largest along the Andes and the adjacent trench.  The formula of Vening Meinesz, $\mathcal{C}_{0\to1}$ applied to $\Delta g$, reproduces $\varepsilon$ to a relative error of %.0e, and the geoid is recovered from $\varepsilon$ and from $\Gamma$ to relative errors of %.0e and %.0e.
     """ % _errs)])
     return
@@ -552,7 +591,7 @@ def _(L):
     _decl = np.degrees(np.arctan2(_f_h.imag, -_f_h.real))  # east of north
     _incl = np.degrees(np.arctan2(-_f_r.real, np.abs(_f_h)))
 
-    _fig = Figure(figsize=(13, 8.4), layout="constrained")
+    _fig = new_figure(13, 8.4, "04_geomagnetism")
     mollweide(_fig.add_subplot(2, 3, 1, projection="mollweide"), _b_r / 1e3, coast=True, title="(a) radial field $B_r=\\mathcal{C}_{0\\to0}v$", label="$\\mu$T")
     _ax = _fig.add_subplot(2, 3, 2, projection="mollweide")
     mollweide(_ax, _b_h / 1e3, 1, part="abs", coast=True, title="(b) horizontal field $\\eth v=\\mathcal{C}_{0\\to1}v$", label="$\\mu$T")
@@ -564,7 +603,7 @@ def _(L):
     mollweide(_fig.add_subplot(2, 3, 5, projection="mollweide"), _b_r_core, coast=True, title="(e) $B_r$ at the core–mantle boundary, $\\mathcal{C}_{0\\to0}$", label="mT")
     orthographic(_fig.add_subplot(2, 3, 6), _b_r_core, 0, lat0=np.pi / 2 - 1e-3, lon0=0.0, glyph_flm=_b_h_core, glyph_s=1, coast=True,
                  title="(f) core–mantle boundary beneath the Arctic", label="mT")
-    mo.vstack([mo.as_html(_fig), mo.md(r"""
+    mo.vstack([mo.as_html(_fig), caption("04_geomagnetism", r"""
     **Figure 4.** The geomagnetic field of IGRF-14 in 2025, as fields of spin 0 and 1, and its downward continuation to the core.  Top, from left to right: (a) the radial field $B_r=\mathcal{C}_{0\to0}v$ at the surface, shown as colour in μT on a diverging scale, blue where the field points into the Earth, as in the northern hemisphere, and red where it points out; (b) the modulus of the horizontal field $\eth v=\mathcal{C}_{0\to1}v$, shown as colour in μT on a sequential scale, with $\eth v$ drawn as arrows in the direction in which a compass needle points, whose lengths grow in proportion to the modulus from 35 per cent of the largest length; (c) the declination, shown as colour in degrees east of geographic north on a diverging scale saturated at ±30°, red to the east and blue to the west, with contours every 10°, solid to the east and dashed to the west, among which the solid contours of 0° are the agonic lines.  Bottom: (d) the inclination, shown as colour in degrees below the horizontal, red where the field dips into the Earth and blue where it points out of it, with the magnetic equator as the contour of zero inclination; (e) the radial field continued by $\mathcal{C}_{0\to0}$ to the boundary between the core and the mantle, shown as colour in mT on a diverging scale as in (a); and (f) an orthographic view of the same boundary centred on the North pole, with the continued radial field shown as colour in mT and the horizontal field continued by $\mathcal{C}_{1\to1}$ drawn as arrows as in (b), with the coastlines projected radially onto the boundary for orientation.  The compass needles point towards the north magnetic pole in the Canadian Arctic, the declination is small over Europe and Africa and changes sign across the agonic lines, and at the core the flux is concentrated in patches at high latitudes, with reversed flux, red in the southern hemisphere, beneath the South Atlantic and southern Africa.
     """)])
     return
@@ -595,7 +634,7 @@ def _(wind):
     _wind = wind
     _h = helmholtz(_wind, R_EARTH)
     _view = dict(lat0=np.radians(20), lon0=np.radians(-150))
-    _fig = Figure(figsize=(13, 8.4), layout="constrained")
+    _fig = new_figure(13, 8.4, "05_wind")
     _ax = _fig.add_subplot(2, 3, 1, projection="mollweide")
     mollweide(_ax, _wind, 1, part="abs", coast=True, title="(a) January near-surface wind ${}_1f$", label="m s$^{-1}$")
     mollweide_glyphs(_ax, _wind, 1)
@@ -607,7 +646,7 @@ def _(wind):
     orthographic(_fig.add_subplot(2, 3, 5), _h["f_rot"], 1, part="abs", **_view, coast=True, title="(e) divergence-free part", label="m s$^{-1}$")
     orthographic(_fig.add_subplot(2, 3, 6), _h["f_div"], 1, part="abs", **_view, coast=True, title="(f) curl-free part", label="m s$^{-1}$")
     _sum_err = l2_rel(_h["f_rot"] + _h["f_div"], _wind)
-    mo.vstack([mo.as_html(_fig), mo.md(r"""
+    mo.vstack([mo.as_html(_fig), caption("05_wind", r"""
     **Figure 5.** The January near-surface wind and its vorticity, divergence and Helmholtz decomposition, from the lifted convolutions $\mathcal{C}_{1\to0}$ and $\mathcal{C}_{0\to1}$.  Top, from left to right: (a) the wind speed $|{}_1f|$, shown as colour in m s$^{-1}$ on a sequential scale, with the wind ${}_1f$ drawn as arrows pointing downwind, whose lengths grow in proportion to the speed from 35 per cent of the largest length; (b) the vorticity $-\mathrm{Im}(\bar\eth\,{}_1f)/R_\oplus$ and (c) the divergence $-\mathrm{Re}(\bar\eth\,{}_1f)/R_\oplus$, each shown as colour in $10^{-5}$ s$^{-1}$ on a diverging scale saturated at the 99.5th percentile of its modulus, so that the extreme values over the steep margins of the Greenland and Antarctic ice sheets do not set the scale, red for anticlockwise rotation and for outflow and blue for clockwise rotation and for inflow.  Bottom: orthographic views of the North Pacific, centred on 20°N, 150°W, of (d) the wind, (e) its divergence-free part and (f) its curl-free part, each with its speed shown as colour in m s$^{-1}$ and drawn as arrows as in (a).  The vorticity is positive in the cyclonic flow around the Aleutian and Icelandic lows and negative in the anticyclones of the northern subtropics, and the divergence is negative along the intertropical convergence zone, into which the trade winds of both hemispheres flow.  The divergence-free part carries the trade winds and the westerlies, the curl-free part carries the flow into the convergence zone and out of the subtropical highs, and the two parts sum to the wind to a relative error of %.0e.
     """ % _sum_err)])
     return
@@ -628,13 +667,13 @@ def _(L, wind):
     _comp_moved = _back(componentwise(_to_pole(_wind), 1, _beam))
     _jet = dict(lat0=_lat, lon0=_lon, coast=True, n_glyph=1400, glyph_len=0.05)
     _vmax = float(np.max(np.abs(_speed)))
-    _fig2 = Figure(figsize=(13, 4.6), layout="constrained")
+    _fig2 = new_figure(13, 4.6, "06_wind_smoothing")
     orthographic(_fig2.add_subplot(1, 4, 1), _spin, 1, part="abs", vmax=_vmax, **_jet, title="(a) spin-1 smoothing $\\mathcal{C}_{1\\to1}$", label="m s$^{-1}$")
     orthographic(_fig2.add_subplot(1, 4, 2), _comp, 1, part="abs", vmax=_vmax, **_jet, title="(b) components as scalars,\ngeographic coordinates", label="m s$^{-1}$")
     orthographic(_fig2.add_subplot(1, 4, 3), _comp_moved, 1, part="abs", vmax=_vmax, **_jet, title="(c) components as scalars,\npole at the centre", label="m s$^{-1}$")
     orthographic(_fig2.add_subplot(1, 4, 4), _comp_moved - _spin, 1, part="abs", cmap="Greys", vmax=_vmax, glyph_floor=0.0, **_jet,
                  title="(d) difference of (c) and (a)", label="m s$^{-1}$")
-    mo.vstack([mo.as_html(_fig2), mo.md(r"""
+    mo.vstack([mo.as_html(_fig2), caption("06_wind_smoothing", r"""
     **Figure 6.** Smoothing the wind as a spin-1 field and as two scalar components.  Orthographic views centred on the strongest wind after smoothing, at %.0f°%s, %.0f°%s, of the wind smoothed by a Gaussian of width $8/L$ radians, each with its speed shown as colour in m s$^{-1}$ on a common sequential scale and drawn as arrows as in Fig. 5.  From left to right: (a) the smoothing by the spin-1 convolution $\mathcal{C}_{1\to1}$, which, with the pole of the coordinates placed at the centre of the view, gives the same result to a relative error of %.0e; (b) the smoothing of the components $v_\theta$ and $v_\varphi$ as scalar fields in geographic coordinates; (c) the same smoothing of the components with the pole of the coordinates at the centre of the view; and (d) the modulus of the difference between (c) and (a), shown as colour on the same scale, from white to black, with the difference drawn as arrows whose lengths are proportional to its modulus.  The component-wise smoothing agrees closely with the spin-1 smoothing in geographic coordinates, but with the pole at the centre it destroys the flow within about the width of the smoothing of the pole, where the frame turns fastest, with a relative error of %.0e over the sphere.
     """ % (abs(np.degrees(_lat)), "N" if _lat >= 0 else "S", abs(((np.degrees(_lon) + 180) % 360) - 180), "E" if ((np.degrees(_lon) + 180) % 360) - 180 >= 0 else "W",
            l2_rel(_spin_moved, _spin), l2_rel(_comp_moved, _spin)))])
@@ -659,7 +698,7 @@ def _(L):
     _psi_grid, _ = field_grid(_psi)
     _levels = np.linspace(-1, 1, 13) * np.max(np.abs(_psi_grid.real))
     _div = _h["div"] * 1e7
-    _fig = Figure(figsize=(13, 8.6), layout="constrained")
+    _fig = new_figure(13, 8.6, "07_ocean_currents")
     _ax = _fig.add_subplot(2, 2, 1, projection="mollweide")
     mollweide(_ax, _cur, 1, part="abs", coast=True, title="(a) surface currents ${}_1f$, 2025", label="m s$^{-1}$")
     mollweide_glyphs(_ax, _cur, 1, n_glyph=1200, size=0.02, floor=0.0)
@@ -669,7 +708,7 @@ def _(L):
               title="(c) divergence $-\\mathrm{Re}\\,\\bar\\eth\\,{}_1f/R_\\oplus$", label="$10^{-7}$ s$^{-1}$")
     orthographic(_fig.add_subplot(2, 2, 4), _div, 0, lat0=np.radians(-5), lon0=np.radians(-110), glyph_flm=_cur, glyph_s=1, coast=True, glyph_floor=0.0,
                  vmax=robust_vmax(_div), title="(d) eastern equatorial Pacific", label="$10^{-7}$ s$^{-1}$")
-    mo.vstack([mo.as_html(_fig), mo.md(r"""
+    mo.vstack([mo.as_html(_fig), caption("07_ocean_currents", r"""
     **Figure 7.** The surface currents of the ocean in 2025, their stream function and their divergence, from the lifted convolution $\mathcal{C}_{1\to0}$.  Top: (a) the current speed $|{}_1f|$, shown as colour in m s$^{-1}$ on a sequential scale, with the current drawn as arrows pointing downstream, whose lengths are proportional to the speed; (b) the stream function $\psi$ of the divergence-free part, shown as colour in $10^6$ m$^2$ s$^{-1}$ on a diverging scale, with twelve equally spaced contours, the streamlines, drawn solid for positive and dashed for negative values.  Bottom: (c) the divergence $-\mathrm{Re}(\bar\eth\,{}_1f)/R_\oplus$, shown as colour in $10^{-7}$ s$^{-1}$ on a diverging scale saturated at the 99.5th percentile of its modulus, red where the surface flow diverges and water upwells and blue where it converges; and (d) an orthographic view of the eastern equatorial Pacific, centred on 5°S, 110°W, with the divergence shown as colour as in (c) and the currents drawn as arrows as in (a).  The fastest currents are the westward equatorial currents of the Pacific, Atlantic and Indian Oceans; the subtropical gyres appear as maxima of $\psi$, red, in the northern hemisphere and minima, blue, in the southern hemisphere; and the divergence is concentrated along the equator in the Pacific and Atlantic and along the coast of Peru, where the equatorial currents diverge from the equator.
     """)])
     return
@@ -700,7 +739,7 @@ def _(L):
     _map_err = float(np.linalg.norm(_p_map_back - _p_map) / np.linalg.norm(_p_map))
     _beam = gaussian(L, 4 / L)
     _smooth = lambda _x: apply(_x, _beam, 2, 2)  # C_{2->2}, for the sticks
-    _fig = Figure(figsize=(13, 7.4), layout="constrained")
+    _fig = new_figure(13, 7.4, "08_cmb_polarisation")
     _grid = _fig.add_gridspec(2, 6)
     _axes = [_fig.add_subplot(_grid[0, 2 * _i : 2 * _i + 2], projection="mollweide") for _i in range(3)]
     _axes += [_fig.add_subplot(_grid[1, 2 * _i + 1 : 2 * _i + 3], projection="mollweide") for _i in range(2)]
@@ -715,7 +754,7 @@ def _(L):
     _ax = _axes[4]
     mollweide(_ax, _p_back, 2, part="abs", title="(e) polarisation from $E$ and $B$, $\\mathcal{C}_{0\\to2}$", label="$\\mu$K")
     mollweide_glyphs(_ax, _smooth(_p_back), 2)
-    mo.vstack([mo.as_html(_fig), mo.md(r"""
+    mo.vstack([mo.as_html(_fig), caption("08_cmb_polarisation", r"""
     **Figure 8.** The temperature and polarisation of the CMB measured by Planck, the $E$ and $B$ modes of the polarisation from the lifted convolutions $\mathcal{C}_{2\to0}+\mathcal{C}_{-2\to0}$, and the polarisation synthesised again from the two modes by $\mathcal{C}_{0\to2}$, in Galactic coordinates.  Top, from left to right: (a) the temperature anisotropy, shown as colour in μK on a diverging scale, red hotter and blue colder than the mean, with the polarisation, smoothed by the spin-2 convolution $\mathcal{C}_{2\to2}$ with a Gaussian of width $4/L$ radians so that the sticks follow its large-scale pattern, drawn as headless sticks along the direction of polarisation, at the angle $\arg(Q+\mathrm{i}U)/2$, whose lengths grow in proportion to the polarised intensity from 35 per cent of the largest length; (b) the polarised intensity $|Q+\mathrm{i}U|$, shown as colour in μK on a sequential scale, with the same sticks; (c) the $E$ mode, shown as colour in μK on a diverging scale.  Bottom: (d) the $B$ mode, shown as colour in μK on a diverging scale; (e) the polarised intensity of the polarisation synthesised from the $E$ and $B$ modes, shown as colour in μK as in (b), with its smoothed polarisation drawn as sticks as in (a).  Both modes show residual Galactic emission along the equator of the maps, and the $B$ mode, which on these scales is dominated by noise and by these residuals, has an rms of %.0f per cent of that of the $E$ mode.  The decomposition and its inverse are single multipliers in harmonic space, $-\tfrac12$ and $\pm\tfrac{\mathrm{i}}2$ one way and $-1$ and $\mp\mathrm{i}$ the other, so that the polarisation synthesised from the two modes reproduces the measured polarisation to the precision of the arithmetic.  Starting from the map of the polarisation, computing the maps of the $E$ and $B$ modes and synthesising the map of the polarisation again, including all the harmonic transforms, recovers the map to a relative $L^2$ error of %.1e, set by the rounding errors of the transforms.
     """ % (100 * np.linalg.norm(np.asarray(_b)) / np.linalg.norm(np.asarray(_e)), _map_err))])
     return
@@ -739,14 +778,14 @@ def _(L):
     _gamma = physics.kaiser_squires(_kappa)  # C_{0->2}
     _kappa_back = physics.kaiser_squires_inverse(_gamma)  # C_{2->0}
     _g = gaussian(L, 8 / L)[:, None]  # smoothing, which commutes with both, so that the sticks resolve the pattern
-    _fig = Figure(figsize=(13, 8.6), layout="constrained")
+    _fig = new_figure(13, 8.6, "09_lensing")
     mollweide(_fig.add_subplot(2, 2, 1, projection="mollweide"), _kappa, title="(a) simulated convergence $\\kappa$", label="dimensionless")
     mollweide(_fig.add_subplot(2, 2, 2, projection="mollweide"), _gamma, 2, part="abs", title="(b) shear $\\gamma=\\mathcal{C}_{0\\to2}[\\mathcal{D}]\\kappa$", label="dimensionless")
     mollweide(_fig.add_subplot(2, 2, 3, projection="mollweide"), _kappa_back, vmax=float(np.max(np.abs(field_grid(_kappa)[0]))),
               title="(c) convergence recovered from $\\gamma$ by $\\mathcal{C}_{2\\to0}$", label="dimensionless")
     orthographic(_fig.add_subplot(2, 2, 4), _kappa * _g, 0, glyph_flm=_gamma * _g, glyph_s=2, n_glyph=1200,
                  title="(d) smoothed $\\kappa$ and its shear", label="dimensionless")
-    mo.vstack([mo.as_html(_fig), mo.md(r"""
+    mo.vstack([mo.as_html(_fig), caption("09_lensing", r"""
     **Figure 9.** The convergence and shear of weak gravitational lensing, related by the lifted convolutions $\mathcal{C}_{0\to2}$ and $\mathcal{C}_{2\to0}$.  Top: (a) the simulated convergence $\kappa$, shown as colour on a diverging scale, red for overdense and blue for underdense regions; (b) the modulus of the shear $\gamma=\mathcal{C}_{0\to2}[\mathcal{D}]\kappa$, shown as colour on a sequential scale.  Bottom: (c) the convergence recovered from the shear by $\mathcal{C}_{2\to0}[\mathcal{D}^{-1}]$, shown as colour on the diverging scale of (a); and (d) an orthographic view, centred on 20°N, 34°E in the coordinates of the simulation, of the convergence smoothed by a Gaussian of width $8/L$ radians, shown as colour on a diverging scale, with the shear smoothed in the same way drawn as headless sticks along the direction in which the images are stretched, at the angle $\arg(\gamma)/2$, whose lengths grow in proportion to $|\gamma|$ from 35 per cent of the largest length.  The smoothing is a multiplier and commutes with $\mathcal{C}_{0\to2}[\mathcal{D}]$, so that the smoothed shear is the shear of the smoothed convergence.  The sticks circle the overdense regions and point away from the underdense regions, and the convergence recovered from the shear reproduces (a) to a relative error of %.0e, since the simulated convergence has no monopole or dipole.
     """ % l2_rel(_kappa_back, _kappa))])
     return
