@@ -432,7 +432,9 @@ def mollweide_grid(ax, data, thetas, phis, cmap="RdBu_r", vmax=None, symmetric=T
     image = ax.pcolormesh(lon, np.pi / 2 - thetas, data, shading="gouraud", cmap=cmap,
                           vmin=-vmax if symmetric else 0.0, vmax=vmax, rasterized=True)
     if contours is not None:
-        ax.contour(lon, np.pi / 2 - thetas, data, levels=contours, colors="k", linewidths=0.6)
+        # rasterised with the map: the projection subdivides every short segment of the contours, which as vectors
+        # would make a printed figure several megabytes larger
+        ax.contour(lon, np.pi / 2 - thetas, data, levels=contours, colors="k", linewidths=0.6, rasterized=True)
     if coast:
         c_lon, c_lat = coastline()
         jump = np.abs(np.diff(c_lon, prepend=c_lon[0])) > np.pi  # break the lines where they cross the map's edge
