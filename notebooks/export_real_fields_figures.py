@@ -2,13 +2,13 @@
 Export the figures of the notebook real_fields.py for the article.
 
 The notebook is run in print mode, in which each figure is drawn at the text width
-of the one-column layout of the article (6.5 inches) with 8 pt text and panel titles
-reduced to their letters, which the captions describe.  Each figure is saved as a
-vector PDF in notebooks/figures, with the map images rasterised at 300 dpi and the
-glyphs, coastlines, colour bars and text as vectors, together with
-real_fields_captions.md, which gives the caption of each figure as computed by the
-notebook, the data it uses and the commit of the code.  Run from the root of the
-repository, with
+of the one-column layout of the article (6.5 inches), with at most three panels per
+row, each as wide as its column, 8 pt text, and the letter of each panel, which the
+captions describe, beneath its colour bar.  Each figure is saved as a vector PDF in
+notebooks/figures, with the map images rasterised at 300 dpi and the glyphs,
+coastlines, colour bars and text as vectors, together with real_fields_captions.md,
+which gives the caption of each figure as computed by the notebook, the data it uses
+and the commit of the code.  Run from the root of the repository, with
 
     python notebooks/export_real_fields_figures.py
 """
@@ -56,7 +56,15 @@ def main():
         ["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=HERE
     ).stdout.strip()
     dirty = subprocess.run(
-        ["git", "status", "--porcelain", "--", "notebooks/real_fields.py", "s2conv"],
+        [
+            "git",
+            "status",
+            "--porcelain",
+            "--",
+            "notebooks/real_fields.py",
+            "notebooks/export_real_fields_figures.py",
+            "s2conv",
+        ],
         capture_output=True,
         text=True,
         cwd=HERE.parent,
@@ -71,8 +79,9 @@ def main():
         f"Produced by `notebooks/export_real_fields_figures.py` from s2conv commit "
         f"`{commit}`{' (with uncommitted changes)' if dirty else ''}, at band-limit "
         f"L = {L}, the default of the notebook.  Each figure is "
-        f"{real_fields.PRINT['width']} inches wide, with 8 pt text; the panel titles "
-        "are reduced to their letters, and the captions below, which the notebook "
+        f"{real_fields.PRINT['width']} inches wide, with at most three panels per row, "
+        "each as wide as its column, and 8 pt text; each panel is labelled by its "
+        "letter beneath its colour bar, and the captions below, which the notebook "
         "computes, describe the panels.  The map images are rasterised at 300 dpi; "
         "glyphs, coastlines, colour bars and text are vectors.  The Earth fields are "
         "tapered by "
@@ -82,6 +91,7 @@ def main():
     ]
     for name, fig in real_fields.PRINT["figures"].items():
         path = OUT / f"real_fields_{name}.pdf"
+        real_fields.fit_height(name)  # the largest panels that the width allows
         fig.savefig(path, dpi=300)
         width, height = fig.get_size_inches()
         lines += [
