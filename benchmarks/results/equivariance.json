@@ -1,0 +1,1403 @@
+{
+  "date_time": "2026-10-01T00:47:43",
+  "command": "benchmarks/equivariance.py -L 32 64 128 -o benchmarks/results/equivariance.json --latex benchmarks/results/equivariance.tex",
+  "arguments": {
+    "bandlimits": [
+      32,
+      64,
+      128
+    ],
+    "signals": 100,
+    "rotations": 100,
+    "precision": "double",
+    "matmul_precision": "highest",
+    "operators": null,
+    "seed": 0,
+    "reduction_signals": 10,
+    "time_L": 128,
+    "repeats": 5,
+    "output": "benchmarks/results/equivariance.json",
+    "latex": "benchmarks/results/equivariance.tex",
+    "list": false
+  },
+  "system": {
+    "platform": "Linux-6.17.0-1032-nvidia-aarch64-with-glibc2.39",
+    "python": "3.12.14",
+    "numpy": "2.5.3",
+    "jax": "0.11.2",
+    "s2fft": "1.4.1.dev21",
+    "s2conv": "0.0.0.dev7",
+    "devices": [
+      "cuda:0"
+    ],
+    "x64": true
+  },
+  "code": {
+    "s2conv": {
+      "repository": "/home/mcewen/src/s2conv",
+      "commit": "c5648767b29a4936cd42ca08954decb3944c39f0",
+      "dirty": false,
+      "modified": []
+    },
+    "benchmark": {
+      "repository": "/home/mcewen/src/s2conv",
+      "commit": "c5648767b29a4936cd42ca08954decb3944c39f0",
+      "dirty": false,
+      "modified": []
+    },
+    "s2fft": {
+      "repository": "/home/mcewen/src/s2fft",
+      "commit": "86a4dff303539202ebbfa28661d85331e0e2bff4",
+      "dirty": false,
+      "modified": []
+    }
+  },
+  "results": [
+    {
+      "name": "spin_0_0",
+      "label": "$\\mathcal{C}_{0\\to0}[\\Psi]$",
+      "domain": "S2, s=0 -> 0",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 4.845647521038636e-16,
+          "std": 1.402588935277509e-17,
+          "max": 5.429289632893419e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 4.845647521038636e-16,
+          "std": 1.4025889352775093e-17,
+          "max": 5.429289632893418e-16
+        }
+      },
+      "reduction": 1.3556029568150914e-16,
+      "seconds": 0.6257564559928142
+    },
+    {
+      "name": "spin_2_1",
+      "label": "$\\mathcal{C}_{2\\to1}[\\Psi]$",
+      "domain": "S2, s=2 -> 1",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 4.892631596606592e-16,
+          "std": 1.403469278921405e-17,
+          "max": 5.575309435104528e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 4.892631596606592e-16,
+          "std": 1.4034692789214052e-17,
+          "max": 5.575309435104529e-16
+        }
+      },
+      "reduction": 1.2664968275821178e-16,
+      "seconds": 0.2617546730034519
+    },
+    {
+      "name": "spin_-1_2",
+      "label": "$\\mathcal{C}_{-1\\to2}[\\Psi]$",
+      "domain": "S2, s=-1 -> 2",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 4.678193926910707e-16,
+          "std": 1.4853147243820386e-17,
+          "max": 5.3471062084490065e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 4.678193926910707e-16,
+          "std": 1.4853147243820383e-17,
+          "max": 5.347106208449006e-16
+        }
+      },
+      "reduction": 1.3133655965614801e-16,
+      "seconds": 0.25441281699750107
+    },
+    {
+      "name": "spin_0_G",
+      "label": "$\\mathcal{C}_{0\\to G}[\\Psi]$",
+      "domain": "S2, s=0 -> SO(3), N=5",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 4.790309757454665e-16,
+          "std": 7.150144109149431e-18,
+          "max": 5.035639023820793e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 4.790309757454665e-16,
+          "std": 7.150144109149431e-18,
+          "max": 5.035639023820793e-16
+        }
+      },
+      "reduction": 1.3000577118060264e-16,
+      "seconds": 0.943146549994708
+    },
+    {
+      "name": "spin_2_G",
+      "label": "$\\mathcal{C}_{2\\to G}[\\Psi]$",
+      "domain": "S2, s=2 -> SO(3), N=5",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 4.884114619864424e-16,
+          "std": 7.525811296579153e-18,
+          "max": 5.191665185421664e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 4.884114619864424e-16,
+          "std": 7.525811296579153e-18,
+          "max": 5.191665185421664e-16
+        }
+      },
+      "reduction": 1.3428269194652194e-16,
+      "seconds": 0.9096233500022208
+    },
+    {
+      "name": "group_0",
+      "label": "$\\mathcal{C}_{G\\to0}[\\Psi]$",
+      "domain": "SO(3), N=5 -> S2, s=0",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 5.275294451895532e-16,
+          "std": 1.1646132108822496e-17,
+          "max": 5.738489036010108e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 5.275294451895532e-16,
+          "std": 1.1646132108822494e-17,
+          "max": 5.738489036010108e-16
+        }
+      },
+      "reduction": 2.0932945040401222e-16,
+      "seconds": 0.9417483370052651
+    },
+    {
+      "name": "group_2",
+      "label": "$\\mathcal{C}_{G\\to2}[\\Psi]$",
+      "domain": "SO(3), N=5 -> S2, s=2",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 5.272863556467411e-16,
+          "std": 1.173110269369358e-17,
+          "max": 5.69340609284939e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 5.272863556467411e-16,
+          "std": 1.173110269369358e-17,
+          "max": 5.69340609284939e-16
+        }
+      },
+      "reduction": 2.2064758685872658e-16,
+      "seconds": 0.8408890420105308
+    },
+    {
+      "name": "group_G",
+      "label": "$\\mathcal{C}_{G\\to G}[\\Psi]$",
+      "domain": "SO(3) -> SO(3), N=5",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 8.7011542055042125e-16,
+          "std": 7.883765570178666e-18,
+          "max": 8.995035772825448e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 8.7011542055042125e-16,
+          "std": 7.883765570178666e-18,
+          "max": 8.995035772825446e-16
+        }
+      },
+      "reduction": 0.0,
+      "seconds": 1.3931500309990952
+    },
+    {
+      "name": "axisymmetric",
+      "label": "axisymmetric convolution",
+      "domain": "S2, s=0 -> 0",
+      "group": "classical",
+      "equivariant": true,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 3.9502075018655374e-16,
+          "std": 1.3752841801391603e-17,
+          "max": 4.517516949195131e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 3.9502075018655374e-16,
+          "std": 1.3752841801391603e-17,
+          "max": 4.517516949195131e-16
+        }
+      },
+      "reduction": 1.9335860973791132e-16,
+      "seconds": 0.2741523110016715
+    },
+    {
+      "name": "left",
+      "label": "left convolution (Driscoll--Healy)",
+      "domain": "S2, s=0 -> 0",
+      "group": "classical",
+      "equivariant": true,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 4.332036901757949e-16,
+          "std": 1.4358749294216047e-17,
+          "max": 4.982310146827549e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 4.332036901757949e-16,
+          "std": 1.4358749294216047e-17,
+          "max": 4.982310146827549e-16
+        }
+      },
+      "reduction": 0.0,
+      "seconds": 0.27454951200343203
+    },
+    {
+      "name": "directional",
+      "label": "directional convolution",
+      "domain": "S2, s=2 -> SO(3), N=5",
+      "group": "classical",
+      "equivariant": true,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 4.4180296075391063e-16,
+          "std": 7.019443502674697e-18,
+          "max": 4.671250280035129e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 4.4180296075391063e-16,
+          "std": 7.019443502674697e-18,
+          "max": 4.671250280035128e-16
+        }
+      },
+      "reduction": 1.3600357185830836e-16,
+      "seconds": 0.9005733450030675
+    },
+    {
+      "name": "synthesis",
+      "label": "directional synthesis",
+      "domain": "SO(3), N=5 -> S2, s=2",
+      "group": "classical",
+      "equivariant": true,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 5.055288998836545e-16,
+          "std": 1.0453030312765776e-17,
+          "max": 5.484260594614587e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 5.055288998836545e-16,
+          "std": 1.0453030312765776e-17,
+          "max": 5.484260594614587e-16
+        }
+      },
+      "reduction": 1.5087351247099298e-16,
+      "seconds": 0.8728603779891273
+    },
+    {
+      "name": "eth",
+      "label": "$\\eth$",
+      "domain": "S2, s=1 -> 2",
+      "group": "physics",
+      "equivariant": true,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 5.127376141088205e-16,
+          "std": 1.316030614146745e-17,
+          "max": 5.635117329404513e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 5.127376141088205e-16,
+          "std": 1.316030614146745e-17,
+          "max": 5.635117329404513e-16
+        }
+      },
+      "reduction": 0.0,
+      "seconds": 0.25367335899500176
+    },
+    {
+      "name": "ethbar",
+      "label": "$\\bar\\eth$",
+      "domain": "S2, s=1 -> 0",
+      "group": "physics",
+      "equivariant": true,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 5.131983464186307e-16,
+          "std": 1.333010275927009e-17,
+          "max": 5.636323819653542e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 5.131983464186307e-16,
+          "std": 1.333010275927009e-17,
+          "max": 5.636323819653542e-16
+        }
+      },
+      "reduction": 0.0,
+      "seconds": 0.304561768003623
+    },
+    {
+      "name": "e_mode",
+      "label": "$E$ mode from $Q + \\mathrm{i}U$",
+      "domain": "S2, s=2 -> 0",
+      "group": "physics",
+      "equivariant": true,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 5.567882329552217e-16,
+          "std": 1.336540568572731e-17,
+          "max": 6.058003428600974e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 5.567882329552217e-16,
+          "std": 1.336540568572731e-17,
+          "max": 6.058003428600974e-16
+        }
+      },
+      "reduction": 0.0,
+      "seconds": 0.2947734390036203
+    },
+    {
+      "name": "kaiser_squires",
+      "label": "Kaiser--Squires",
+      "domain": "S2, s=0 -> 2",
+      "group": "physics",
+      "equivariant": true,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 4.728642556898522e-16,
+          "std": 1.0643443960900065e-17,
+          "max": 5.131752389105377e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 4.728642556898522e-16,
+          "std": 1.0643443960900066e-17,
+          "max": 5.131752389105377e-16
+        }
+      },
+      "reduction": 0.0,
+      "seconds": 0.2830617410072591
+    },
+    {
+      "name": "standard_correlation",
+      "label": "standard correlation",
+      "domain": "S2, s=0 -> S2 (section), N=5",
+      "group": "not equivariant",
+      "equivariant": false,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.368856655814352,
+          "std": 0.14901840020624535,
+          "max": 1.5544713257761689
+        },
+        "output_of_rotated_input": {
+          "mean": 1.3710933658823248,
+          "std": 0.14901541199062443,
+          "max": 1.5679390063770762
+        }
+      },
+      "reduction": 3.496852689478452e-16,
+      "seconds": 27.10124323099444
+    },
+    {
+      "name": "commutative_anisotropic",
+      "label": "commutative anisotropic convolution",
+      "domain": "S2, s=0 -> S2 (section), N=5",
+      "group": "not equivariant",
+      "equivariant": false,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.3134029200247783,
+          "std": 0.07752993518932438,
+          "max": 1.482241049026659
+        },
+        "output_of_rotated_input": {
+          "mean": 1.3102920034124874,
+          "std": 0.07724294025282903,
+          "max": 1.4889926678429342
+        }
+      },
+      "reduction": null,
+      "seconds": 26.21555301299668
+    },
+    {
+      "name": "sifting",
+      "label": "sifting convolution",
+      "domain": "S2, s=0 -> 0",
+      "group": "not equivariant",
+      "equivariant": false,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.3949001639419614,
+          "std": 0.025975049456656747,
+          "max": 1.488738738189127
+        },
+        "output_of_rotated_input": {
+          "mean": 1.3974510290212205,
+          "std": 0.026457309074839775,
+          "max": 1.4972907240031714
+        }
+      },
+      "reduction": null,
+      "seconds": 0.3001041190000251
+    },
+    {
+      "name": "harmonic_multiplication",
+      "label": "harmonic multiplication",
+      "domain": "S2, s=0 -> 0",
+      "group": "not equivariant",
+      "equivariant": false,
+      "L": 32,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.3960721125962603,
+          "std": 0.03075816279525566,
+          "max": 1.4785550037762112
+        },
+        "output_of_rotated_input": {
+          "mean": 1.3937187379027112,
+          "std": 0.030788585759919156,
+          "max": 1.4851984599283483
+        }
+      },
+      "reduction": null,
+      "seconds": 0.2633126329892548
+    },
+    {
+      "name": "spin_0_0",
+      "label": "$\\mathcal{C}_{0\\to0}[\\Psi]$",
+      "domain": "S2, s=0 -> 0",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 6.642257895181328e-16,
+          "std": 1.039631356447524e-17,
+          "max": 7.056784891252414e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 6.642257895181328e-16,
+          "std": 1.039631356447524e-17,
+          "max": 7.056784891252414e-16
+        }
+      },
+      "reduction": 1.406527831256065e-16,
+      "seconds": 2.309600817010505
+    },
+    {
+      "name": "spin_2_1",
+      "label": "$\\mathcal{C}_{2\\to1}[\\Psi]$",
+      "domain": "S2, s=2 -> 1",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 6.507075851632238e-16,
+          "std": 9.201872411204814e-18,
+          "max": 6.869904975792409e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 6.507075851632238e-16,
+          "std": 9.201872411204814e-18,
+          "max": 6.869904975792409e-16
+        }
+      },
+      "reduction": 1.3527222488747882e-16,
+      "seconds": 1.1291041540098377
+    },
+    {
+      "name": "spin_-1_2",
+      "label": "$\\mathcal{C}_{-1\\to2}[\\Psi]$",
+      "domain": "S2, s=-1 -> 2",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 6.341102855982803e-16,
+          "std": 9.184667073540397e-18,
+          "max": 6.744587786818913e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 6.341102855982803e-16,
+          "std": 9.184667073540397e-18,
+          "max": 6.744587786818913e-16
+        }
+      },
+      "reduction": 1.3685112657006978e-16,
+      "seconds": 1.1380031690059695
+    },
+    {
+      "name": "spin_0_G",
+      "label": "$\\mathcal{C}_{0\\to G}[\\Psi]$",
+      "domain": "S2, s=0 -> SO(3), N=5",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 9.000378964528224e-16,
+          "std": 6.599551131077205e-18,
+          "max": 9.288303736472486e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 9.000378964528224e-16,
+          "std": 6.599551131077205e-18,
+          "max": 9.288303736472486e-16
+        }
+      },
+      "reduction": 1.351395537718579e-16,
+      "seconds": 4.666268047003541
+    },
+    {
+      "name": "spin_2_G",
+      "label": "$\\mathcal{C}_{2\\to G}[\\Psi]$",
+      "domain": "S2, s=2 -> SO(3), N=5",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 9.095478456670668e-16,
+          "std": 6.796257541294249e-18,
+          "max": 9.394236994352686e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 9.095478456670668e-16,
+          "std": 6.796257541294249e-18,
+          "max": 9.394236994352686e-16
+        }
+      },
+      "reduction": 1.339046228499951e-16,
+      "seconds": 4.530989980994491
+    },
+    {
+      "name": "group_0",
+      "label": "$\\mathcal{C}_{G\\to0}[\\Psi]$",
+      "domain": "SO(3), N=5 -> S2, s=0",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 9.72400371148136e-16,
+          "std": 1.2357135853188928e-17,
+          "max": 1.022629602707379e-15
+        },
+        "output_of_rotated_input": {
+          "mean": 9.72400371148136e-16,
+          "std": 1.2357135853188928e-17,
+          "max": 1.022629602707379e-15
+        }
+      },
+      "reduction": 1.9601371271606232e-16,
+      "seconds": 4.322755728993798
+    },
+    {
+      "name": "group_2",
+      "label": "$\\mathcal{C}_{G\\to2}[\\Psi]$",
+      "domain": "SO(3), N=5 -> S2, s=2",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 9.661969064306217e-16,
+          "std": 1.1279151748772641e-17,
+          "max": 1.008957530539351e-15
+        },
+        "output_of_rotated_input": {
+          "mean": 9.661969064306217e-16,
+          "std": 1.1279151748772641e-17,
+          "max": 1.0089575305393509e-15
+        }
+      },
+      "reduction": 2.1404346261235348e-16,
+      "seconds": 4.25211709200812
+    },
+    {
+      "name": "group_G",
+      "label": "$\\mathcal{C}_{G\\to G}[\\Psi]$",
+      "domain": "SO(3) -> SO(3), N=5",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.1788688182113667e-15,
+          "std": 5.536683761063263e-18,
+          "max": 1.1999553568625534e-15
+        },
+        "output_of_rotated_input": {
+          "mean": 1.1788688182113667e-15,
+          "std": 5.536683761063264e-18,
+          "max": 1.1999553568625534e-15
+        }
+      },
+      "reduction": 0.0,
+      "seconds": 7.789045680008712
+    },
+    {
+      "name": "axisymmetric",
+      "label": "axisymmetric convolution",
+      "domain": "S2, s=0 -> 0",
+      "group": "classical",
+      "equivariant": true,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 5.820146694816632e-16,
+          "std": 1.230419208249438e-17,
+          "max": 6.224390834724495e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 5.820146694816632e-16,
+          "std": 1.230419208249438e-17,
+          "max": 6.224390834724495e-16
+        }
+      },
+      "reduction": 1.8912117467611623e-16,
+      "seconds": 1.1174164919939358
+    },
+    {
+      "name": "left",
+      "label": "left convolution (Driscoll--Healy)",
+      "domain": "S2, s=0 -> 0",
+      "group": "classical",
+      "equivariant": true,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 5.827053630102503e-16,
+          "std": 9.380781989039104e-18,
+          "max": 6.241529515208462e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 5.827053630102503e-16,
+          "std": 9.380781989039104e-18,
+          "max": 6.241529515208461e-16
+        }
+      },
+      "reduction": 0.0,
+      "seconds": 1.1073876320006093
+    },
+    {
+      "name": "directional",
+      "label": "directional convolution",
+      "domain": "S2, s=2 -> SO(3), N=5",
+      "group": "classical",
+      "equivariant": true,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 8.182907728951069e-16,
+          "std": 7.236581196105065e-18,
+          "max": 8.457309680264568e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 8.182907728951069e-16,
+          "std": 7.236581196105065e-18,
+          "max": 8.457309680264568e-16
+        }
+      },
+      "reduction": 1.457824844220586e-16,
+      "seconds": 4.585637712996686
+    },
+    {
+      "name": "synthesis",
+      "label": "directional synthesis",
+      "domain": "SO(3), N=5 -> S2, s=2",
+      "group": "classical",
+      "equivariant": true,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 9.16376769345646e-16,
+          "std": 1.0413219534107819e-17,
+          "max": 9.564670837076799e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 9.16376769345646e-16,
+          "std": 1.0413219534107819e-17,
+          "max": 9.564670837076799e-16
+        }
+      },
+      "reduction": 1.5835878411443566e-16,
+      "seconds": 4.573350399004994
+    },
+    {
+      "name": "eth",
+      "label": "$\\eth$",
+      "domain": "S2, s=1 -> 2",
+      "group": "physics",
+      "equivariant": true,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 7.005468768307677e-16,
+          "std": 9.333857401744244e-18,
+          "max": 7.374021353178522e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 7.005468768307677e-16,
+          "std": 9.333857401744244e-18,
+          "max": 7.374021353178522e-16
+        }
+      },
+      "reduction": 0.0,
+      "seconds": 1.2733527939999476
+    },
+    {
+      "name": "ethbar",
+      "label": "$\\bar\\eth$",
+      "domain": "S2, s=1 -> 0",
+      "group": "physics",
+      "equivariant": true,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 7.000127666407581e-16,
+          "std": 9.250994089615782e-18,
+          "max": 7.405128640631124e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 7.000127666407581e-16,
+          "std": 9.250994089615782e-18,
+          "max": 7.405128640631124e-16
+        }
+      },
+      "reduction": 0.0,
+      "seconds": 1.233604880006169
+    },
+    {
+      "name": "e_mode",
+      "label": "$E$ mode from $Q + \\mathrm{i}U$",
+      "domain": "S2, s=2 -> 0",
+      "group": "physics",
+      "equivariant": true,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 7.28367016038421e-16,
+          "std": 9.080826793750892e-18,
+          "max": 7.617307600227488e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 7.28367016038421e-16,
+          "std": 9.08082679375089e-18,
+          "max": 7.617307600227488e-16
+        }
+      },
+      "reduction": 0.0,
+      "seconds": 1.3081262080086162
+    },
+    {
+      "name": "kaiser_squires",
+      "label": "Kaiser--Squires",
+      "domain": "S2, s=0 -> 2",
+      "group": "physics",
+      "equivariant": true,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 6.4134285273825e-16,
+          "std": 7.254594818736291e-18,
+          "max": 6.732996409076936e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 6.4134285273825e-16,
+          "std": 7.254594818736292e-18,
+          "max": 6.732996409076936e-16
+        }
+      },
+      "reduction": 0.0,
+      "seconds": 1.2224863690062193
+    },
+    {
+      "name": "standard_correlation",
+      "label": "standard correlation",
+      "domain": "S2, s=0 -> S2 (section), N=5",
+      "group": "not equivariant",
+      "equivariant": false,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.3468632543610628,
+          "std": 0.13587173272994854,
+          "max": 1.4809210340422043
+        },
+        "output_of_rotated_input": {
+          "mean": 1.3481212092531605,
+          "std": 0.13611464363939235,
+          "max": 1.4749858227661132
+        }
+      },
+      "reduction": 3.828287911278617e-16,
+      "seconds": 87.53509484700044
+    },
+    {
+      "name": "commutative_anisotropic",
+      "label": "commutative anisotropic convolution",
+      "domain": "S2, s=0 -> S2 (section), N=5",
+      "group": "not equivariant",
+      "equivariant": false,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.3362636426179686,
+          "std": 0.07301662162368831,
+          "max": 1.4611402701182858
+        },
+        "output_of_rotated_input": {
+          "mean": 1.3359771166560128,
+          "std": 0.07266778194633966,
+          "max": 1.4629819822935883
+        }
+      },
+      "reduction": null,
+      "seconds": 86.99030943399703
+    },
+    {
+      "name": "sifting",
+      "label": "sifting convolution",
+      "domain": "S2, s=0 -> 0",
+      "group": "not equivariant",
+      "equivariant": false,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.4076748637869587,
+          "std": 0.012691265685842735,
+          "max": 1.4519736365446183
+        },
+        "output_of_rotated_input": {
+          "mean": 1.407607081544256,
+          "std": 0.012650773614796492,
+          "max": 1.453643396081988
+        }
+      },
+      "reduction": null,
+      "seconds": 1.112572869998985
+    },
+    {
+      "name": "harmonic_multiplication",
+      "label": "harmonic multiplication",
+      "domain": "S2, s=0 -> 0",
+      "group": "not equivariant",
+      "equivariant": false,
+      "L": 64,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.4039463778415855,
+          "std": 0.015309306211702187,
+          "max": 1.4511344186204034
+        },
+        "output_of_rotated_input": {
+          "mean": 1.4050694810220095,
+          "std": 0.015472561623343435,
+          "max": 1.4526603459878096
+        }
+      },
+      "reduction": null,
+      "seconds": 1.1087186939985259
+    },
+    {
+      "name": "spin_0_0",
+      "label": "$\\mathcal{C}_{0\\to0}[\\Psi]$",
+      "domain": "S2, s=0 -> 0",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 9.233081460171079e-16,
+          "std": 7.373239481550054e-18,
+          "max": 9.497898290911106e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 9.233081460171079e-16,
+          "std": 7.373239481550054e-18,
+          "max": 9.497898290911106e-16
+        }
+      },
+      "reduction": 1.3884186633148224e-16,
+      "seconds": 15.992515890000504
+    },
+    {
+      "name": "spin_2_1",
+      "label": "$\\mathcal{C}_{2\\to1}[\\Psi]$",
+      "domain": "S2, s=2 -> 1",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 9.02517477928278e-16,
+          "std": 6.908861450833509e-18,
+          "max": 9.292396799617572e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 9.02517477928278e-16,
+          "std": 6.9088614508335105e-18,
+          "max": 9.292396799617572e-16
+        }
+      },
+      "reduction": 1.3619224210123862e-16,
+      "seconds": 7.279807337996317
+    },
+    {
+      "name": "spin_-1_2",
+      "label": "$\\mathcal{C}_{-1\\to2}[\\Psi]$",
+      "domain": "S2, s=-1 -> 2",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 8.704024206162208e-16,
+          "std": 7.201413462875663e-18,
+          "max": 8.958312776703527e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 8.704024206162208e-16,
+          "std": 7.201413462875663e-18,
+          "max": 8.958312776703527e-16
+        }
+      },
+      "reduction": 1.3577614217920773e-16,
+      "seconds": 7.962144486999023
+    },
+    {
+      "name": "spin_0_G",
+      "label": "$\\mathcal{C}_{0\\to G}[\\Psi]$",
+      "domain": "S2, s=0 -> SO(3), N=5",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.2424730632130968e-15,
+          "std": 4.588982025294535e-18,
+          "max": 1.259278809334047e-15
+        },
+        "output_of_rotated_input": {
+          "mean": 1.2424730632130968e-15,
+          "std": 4.5889820252945356e-18,
+          "max": 1.259278809334047e-15
+        }
+      },
+      "reduction": 1.3087906098821968e-16,
+      "seconds": 34.244133057
+    },
+    {
+      "name": "spin_2_G",
+      "label": "$\\mathcal{C}_{2\\to G}[\\Psi]$",
+      "domain": "S2, s=2 -> SO(3), N=5",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.2492688208402652e-15,
+          "std": 4.604582947356061e-18,
+          "max": 1.2674897478176913e-15
+        },
+        "output_of_rotated_input": {
+          "mean": 1.2492688208402652e-15,
+          "std": 4.604582947356061e-18,
+          "max": 1.2674897478176913e-15
+        }
+      },
+      "reduction": 1.3154941826757691e-16,
+      "seconds": 31.183772072996362
+    },
+    {
+      "name": "group_0",
+      "label": "$\\mathcal{C}_{G\\to0}[\\Psi]$",
+      "domain": "SO(3), N=5 -> S2, s=0",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.3203846013426637e-15,
+          "std": 8.136440285250356e-18,
+          "max": 1.3521632492442398e-15
+        },
+        "output_of_rotated_input": {
+          "mean": 1.3203846013426637e-15,
+          "std": 8.136440285250356e-18,
+          "max": 1.3521632492442398e-15
+        }
+      },
+      "reduction": 1.9714758510747074e-16,
+      "seconds": 30.134670045008534
+    },
+    {
+      "name": "group_2",
+      "label": "$\\mathcal{C}_{G\\to2}[\\Psi]$",
+      "domain": "SO(3), N=5 -> S2, s=2",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.3217137641584809e-15,
+          "std": 7.627847847238952e-18,
+          "max": 1.3514087191598547e-15
+        },
+        "output_of_rotated_input": {
+          "mean": 1.3217137641584809e-15,
+          "std": 7.627847847238952e-18,
+          "max": 1.3514087191598543e-15
+        }
+      },
+      "reduction": 2.0656955557046292e-16,
+      "seconds": 30.05793901499419
+    },
+    {
+      "name": "group_G",
+      "label": "$\\mathcal{C}_{G\\to G}[\\Psi]$",
+      "domain": "SO(3) -> SO(3), N=5",
+      "group": "lifted",
+      "equivariant": true,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.6228846554994663e-15,
+          "std": 3.9096522285928456e-18,
+          "max": 1.63634079708237e-15
+        },
+        "output_of_rotated_input": {
+          "mean": 1.6228846554994663e-15,
+          "std": 3.9096522285928456e-18,
+          "max": 1.63634079708237e-15
+        }
+      },
+      "reduction": 0.0,
+      "seconds": 54.39308469700336
+    },
+    {
+      "name": "axisymmetric",
+      "label": "axisymmetric convolution",
+      "domain": "S2, s=0 -> 0",
+      "group": "classical",
+      "equivariant": true,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 8.312386318328483e-16,
+          "std": 6.960605239663923e-18,
+          "max": 8.543600479392116e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 8.312386318328483e-16,
+          "std": 6.960605239663923e-18,
+          "max": 8.543600479392114e-16
+        }
+      },
+      "reduction": 1.666063457427052e-16,
+      "seconds": 7.319504548009718
+    },
+    {
+      "name": "left",
+      "label": "left convolution (Driscoll--Healy)",
+      "domain": "S2, s=0 -> 0",
+      "group": "classical",
+      "equivariant": true,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 7.578716405084117e-16,
+          "std": 6.610909649844554e-18,
+          "max": 7.842080207179661e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 7.578716405084117e-16,
+          "std": 6.610909649844554e-18,
+          "max": 7.842080207179661e-16
+        }
+      },
+      "reduction": 0.0,
+      "seconds": 7.283990748997894
+    },
+    {
+      "name": "directional",
+      "label": "directional convolution",
+      "domain": "S2, s=2 -> SO(3), N=5",
+      "group": "classical",
+      "equivariant": true,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.1038513372480042e-15,
+          "std": 5.2580107057655975e-18,
+          "max": 1.12042033461534e-15
+        },
+        "output_of_rotated_input": {
+          "mean": 1.103851337248004e-15,
+          "std": 5.258010705765601e-18,
+          "max": 1.12042033461534e-15
+        }
+      },
+      "reduction": 1.4429448635046743e-16,
+      "seconds": 31.097324963993742
+    },
+    {
+      "name": "synthesis",
+      "label": "directional synthesis",
+      "domain": "SO(3), N=5 -> S2, s=2",
+      "group": "classical",
+      "equivariant": true,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.2480780856543758e-15,
+          "std": 6.729878789088982e-18,
+          "max": 1.2767356925030954e-15
+        },
+        "output_of_rotated_input": {
+          "mean": 1.2480780856543758e-15,
+          "std": 6.729878789088981e-18,
+          "max": 1.2767356925030954e-15
+        }
+      },
+      "reduction": 1.61045141706002e-16,
+      "seconds": 30.01404261699645
+    },
+    {
+      "name": "eth",
+      "label": "$\\eth$",
+      "domain": "S2, s=1 -> 2",
+      "group": "physics",
+      "equivariant": true,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 9.618998756739759e-16,
+          "std": 6.446320038984382e-18,
+          "max": 9.839930705096691e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 9.618998756739759e-16,
+          "std": 6.446320038984381e-18,
+          "max": 9.839930705096691e-16
+        }
+      },
+      "reduction": 0.0,
+      "seconds": 7.309859425993636
+    },
+    {
+      "name": "ethbar",
+      "label": "$\\bar\\eth$",
+      "domain": "S2, s=1 -> 0",
+      "group": "physics",
+      "equivariant": true,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 9.619720654453019e-16,
+          "std": 6.399089971421964e-18,
+          "max": 9.863096292695039e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 9.619720654453019e-16,
+          "std": 6.399089971421963e-18,
+          "max": 9.86309629269504e-16
+        }
+      },
+      "reduction": 0.0,
+      "seconds": 7.329004407001776
+    },
+    {
+      "name": "e_mode",
+      "label": "$E$ mode from $Q + \\mathrm{i}U$",
+      "domain": "S2, s=2 -> 0",
+      "group": "physics",
+      "equivariant": true,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 9.673578713607642e-16,
+          "std": 6.439805076007756e-18,
+          "max": 9.904805509345187e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 9.673578713607642e-16,
+          "std": 6.439805076007757e-18,
+          "max": 9.904805509345187e-16
+        }
+      },
+      "reduction": 0.0,
+      "seconds": 7.34260321999318
+    },
+    {
+      "name": "kaiser_squires",
+      "label": "Kaiser--Squires",
+      "domain": "S2, s=0 -> 2",
+      "group": "physics",
+      "equivariant": true,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 8.769330439552233e-16,
+          "std": 5.114753402284377e-18,
+          "max": 8.967558850266222e-16
+        },
+        "output_of_rotated_input": {
+          "mean": 8.769330439552233e-16,
+          "std": 5.1147534022843785e-18,
+          "max": 8.967558850266222e-16
+        }
+      },
+      "reduction": 0.0,
+      "seconds": 7.3136485680006444
+    },
+    {
+      "name": "standard_correlation",
+      "label": "standard correlation",
+      "domain": "S2, s=0 -> S2 (section), N=5",
+      "group": "not equivariant",
+      "equivariant": false,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.3305880110160009,
+          "std": 0.13830278469069723,
+          "max": 1.4569062082488975
+        },
+        "output_of_rotated_input": {
+          "mean": 1.3311830947915808,
+          "std": 0.13839472673256153,
+          "max": 1.4549312977199287
+        }
+      },
+      "reduction": 3.7677669945848193e-16,
+      "seconds": 496.67379251800594
+    },
+    {
+      "name": "commutative_anisotropic",
+      "label": "commutative anisotropic convolution",
+      "domain": "S2, s=0 -> S2 (section), N=5",
+      "group": "not equivariant",
+      "equivariant": false,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.3217655564283353,
+          "std": 0.07351718244352469,
+          "max": 1.4324778395835687
+        },
+        "output_of_rotated_input": {
+          "mean": 1.3227107828055213,
+          "std": 0.07363451968082385,
+          "max": 1.4360121874381675
+        }
+      },
+      "reduction": null,
+      "seconds": 497.80326894001337
+    },
+    {
+      "name": "sifting",
+      "label": "sifting convolution",
+      "domain": "S2, s=0 -> 0",
+      "group": "not equivariant",
+      "equivariant": false,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.4095113319714607,
+          "std": 0.006534600827969943,
+          "max": 1.4310212723701936
+        },
+        "output_of_rotated_input": {
+          "mean": 1.4089199740994516,
+          "std": 0.006530434042946528,
+          "max": 1.430869010524723
+        }
+      },
+      "reduction": null,
+      "seconds": 7.385112525007571
+    },
+    {
+      "name": "harmonic_multiplication",
+      "label": "harmonic multiplication",
+      "domain": "S2, s=0 -> 0",
+      "group": "not equivariant",
+      "equivariant": false,
+      "L": 128,
+      "errors": {
+        "rotated_output": {
+          "mean": 1.408604467335406,
+          "std": 0.007554222569664744,
+          "max": 1.431311232135382
+        },
+        "output_of_rotated_input": {
+          "mean": 1.4082803417291505,
+          "std": 0.0077257876795257755,
+          "max": 1.4326236489007298
+        }
+      },
+      "reduction": null,
+      "seconds": 7.324814085994149
+    }
+  ],
+  "timings": {
+    "L": 128,
+    "repeats": 5,
+    "seconds": {
+      "spin_0_0": 0.017398379000951536,
+      "spin_2_1": 0.01784239598782733,
+      "spin_-1_2": 0.017925692998687737,
+      "spin_0_G": 0.040790669998386875,
+      "spin_2_G": 0.04149641799449455,
+      "group_0": 0.05561198199575301,
+      "group_2": 0.0542808239988517,
+      "group_G": 0.07733685900166165,
+      "axisymmetric": 0.017312762996880338,
+      "left": 0.017357851000269875,
+      "directional": 0.04194593901047483,
+      "synthesis": 0.0554179809987545,
+      "eth": 0.018577167007606477,
+      "ethbar": 0.018145102003472857,
+      "e_mode": 0.017770684004062787,
+      "kaiser_squires": 0.01814983801159542,
+      "standard_correlation": 0.06997482800215948,
+      "commutative_anisotropic": 0.06914765600231476,
+      "sifting": 0.01759457099251449,
+      "harmonic_multiplication": 0.017381707002641633
+    }
+  }
+}
