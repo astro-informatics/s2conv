@@ -395,6 +395,9 @@ def mollweide_glyphs(ax, flm, s, n_glyph=700, size=0.022, color="k", lat_max=np.
     angle = np.angle(z) / s
     lon, lat = np.mod(phi + np.pi, 2 * np.pi) - np.pi, np.pi / 2 - theta
     step = 1e-3
+    # give the map its final shape, 2:1, before measuring directions on the screen: until the figure is drawn the
+    # axes fill their whole cell, which would stretch north-south steps and tilt the glyphs towards the vertical
+    ax.apply_aspect()
     start = ax.transData.transform(np.stack([lon, lat], -1))
     end = ax.transData.transform(np.stack([lon + step * np.sin(angle) / np.cos(lat), lat - step * np.cos(angle)], -1))
     screen = np.arctan2(*(end - start)[:, ::-1].T)
