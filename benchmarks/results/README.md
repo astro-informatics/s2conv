@@ -1,6 +1,10 @@
-# Equivariance benchmark results
+# Benchmark results
 
-The outputs of `benchmarks/equivariance.py`, as the script wrote them, unedited:
+The outputs of the benchmarks, as the scripts wrote them, unedited.
+
+## Equivariance
+
+The outputs of `benchmarks/equivariance.py`:
 
 | File | Contents |
 |:--|:--|
@@ -25,3 +29,28 @@ The equivariance error of an operator T is the mean, over all pairs of a signal 
 mean normalised by ‖T(𝓡f)‖, as in Cobb et al. (2021) and Ocampo et al. (2023), and the standard deviations and
 maxima.  The [user guide](https://astro-informatics.github.io/s2conv/user_guide/equivariance.html) describes the
 protocol.
+
+## Computation time
+
+The outputs of `benchmarks/scaling.py`:
+
+| File | Contents |
+|:--|:--|
+| `scaling.md` | The printed output: two provenance lines and the table of times and fitted exponents |
+| `scaling.json` | Every run time, the medians and the fits, with the arguments, the system, the hardware and the git commits of the code |
+| `scaling.pdf` | The plot: (a) the times against band-limit on logarithmic axes, with an L³ reference; (b) the times divided by L³ |
+
+They were produced on 1 October 2026 by running, from the repository root,
+
+```bash
+python benchmarks/scaling.py -o benchmarks/results/scaling.json --plot benchmarks/results/scaling.pdf \
+    > benchmarks/results/scaling.md
+```
+
+that is, by timing C<sub>2→1</sub>, C<sub>2→G</sub>, C<sub>G→2</sub> and C<sub>G→G</sub>, with random kernels and N = 5,
+end to end with their transforms, at band-limits from 8 to 256, as the median of 5 runs in double precision, on one
+Cortex-X925 core of an NVIDIA GB10 (core 5, 3.9 GHz) with the multithreading of XLA off.  Each file names the code that
+produced it: s2conv commit bd6af5d8b83911bf3055de1dcfa81dd7e8f4a1fc and s2fft commit
+86a4dff303539202ebbfa28661d85331e0e2bff4, both without uncommitted changes.  The power laws fitted from L = 32 have
+exponents 3.12, 3.18, 3.23 and 3.22.  The [user guide](https://astro-informatics.github.io/s2conv/user_guide/scaling.html)
+discusses the results.
