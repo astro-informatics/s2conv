@@ -44,7 +44,10 @@ with app.setup:
     # print mode, switched on by export_real_fields_figures.py: figures at the text width of the article, with at most
     # three panels per row, each as wide as its column, 8 pt text and the panel letters beneath the colour bars, and
     # the figures, their layouts and the captions collected for export
-    PRINT = dict(on=False, width=6.5, figures={}, layouts={}, captions={})
+    PRINT = dict(on=False, width=6.5, figures={}, layouts={}, captions={},
+                 # diameter of the orthographic views in print, relative to the width of their column: a little smaller
+                 # than the column, and, in a row with maps, about as tall as the maps beside it with their colour bars
+                 ortho_scale={"default": 0.82, "04_geomagnetism": 0.62, "07_ocean_currents": 0.62})
 
 
 @app.cell(hide_code=True)
@@ -322,11 +325,15 @@ def panels(name, width, height, rows, print_rows=None):
             offset = n_cols - len(row)
             for i, projection in enumerate(row):
                 ax = fig.add_subplot(grid[r, offset + 2 * i : offset + 2 * i + 2], projection=projection)
-                if PRINT["on"] and None in row and projection == "mollweide":
-                    # beside a taller orthographic view, the map sits at the top of its cell, with its colour bar
-                    # attached beneath it rather than at the foot of the cell
+                if PRINT["on"] and None in row:
+                    # in a row with an orthographic view, each panel sits at the top of its cell with its colour bar
+                    # attached beneath it, so that the views, which are smaller than their columns, and the maps beside
+                    # them keep their colour bars close; panel_size is the width and height of the panel in units of the
+                    # width of its column
                     ax.set_anchor("N")
                     ax.colour_bar_attached = True
+                    scale = PRINT["ortho_scale"].get(name, PRINT["ortho_scale"]["default"])
+                    ax.panel_size = (1.0, 0.5) if projection == "mollweide" else (scale, scale)
                 axes.append(ax)
     if PRINT["on"]:
         PRINT["figures"][name] = fig
@@ -336,11 +343,13 @@ def panels(name, width, height, rows, print_rows=None):
 
 @app.function
 def fit_height(name, rounds=4):
-    """Set the height of a print figure, and of its rows, so that every panel fills the width of its column: the
-    largest panels that the text width allows.  To be called once the figure is drawn."""
+    """Set the height of a print figure, and of its rows, so that every map fills the width of its column, the largest
+    maps that the text width allows, and every orthographic view has the diameter PRINT["ortho_scale"] relative to
+    the width of its column.  To be called once the figure is drawn."""
     fig = PRINT["figures"][name]
     grid, rows, axes = PRINT["layouts"][name]
-    aspect = {"mollweide": 0.5, None: 1.0}  # height over width of a panel
+    scale = PRINT["ortho_scale"].get(name, PRINT["ortho_scale"]["default"])
+    aspect = {"mollweide": 0.5, None: scale}  # height of a panel over the width of its column
     for _ in range(rounds):
         fig.draw_without_rendering()
         width, height = fig.get_size_inches()
@@ -393,9 +402,12 @@ def colour_bar(ax, image, label, letter=None):
     """A horizontal colour bar beneath a panel, labelled with the quantity or its units, and with the letter of the
     panel, if given, centred beneath it."""
     if getattr(ax, "colour_bar_attached", False):
-        # the size and spacing of the other print colour bars, in units of the height of a 2:1 map
-        thickness = 2 * 0.8 / 25
-        bar = ax.figure.colorbar(image, cax=ax.inset_axes([0.1, -0.03 - thickness, 0.8, thickness]), orientation="horizontal")
+        # the size and spacing of the other print colour bars: 0.8 of the width of the column, a thickness of 0.032 and
+        # a gap of 0.015 of it, here in units of the width and height of the panel
+        width, height = ax.panel_size
+        thickness, gap = 0.032 / height, 0.015 / height
+        bar = ax.figure.colorbar(image, cax=ax.inset_axes([0.5 - 0.4 / width, -gap - thickness, 0.8 / width, thickness]),
+                                 orientation="horizontal")
     else:
         bar = ax.figure.colorbar(image, ax=ax, orientation="horizontal", shrink=0.8 if PRINT["on"] else 0.7,
                                  aspect=25 if PRINT["on"] else 30, pad=0.03)
