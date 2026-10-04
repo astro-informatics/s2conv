@@ -1,6 +1,6 @@
 # Figures of the notebook real_fields.py
 
-Produced by `notebooks/export_real_fields_figures.py` from s2conv commit `15e0bc6e43ab5680d0f005dcd47acd1aadcd8431`, at band-limit L = 64, the default of the notebook.  Each figure is 6.5 inches wide, with at most three panels per row, each as wide as its column, and 8 pt text; each panel is labelled by its letter beneath its colour bar, and the captions below, which the notebook computes, describe the panels.  The map images are rasterised at 300 dpi; glyphs, coastlines, colour bars and text are vectors.  The Earth fields are tapered by exp(-l(l+1)/L^2) (Data, in the introduction of the notebook); the directional kernels of the topography have azimuthal orders |m| < 5.
+Produced by `notebooks/export_real_fields_figures.py` from s2conv commit `9d4f56838f7e798e77eaa9febc17192ac6f3f2e7`, at band-limit L = 64, the default of the notebook.  Each figure is 6.5 inches wide, with at most three panels per row, each as wide as its column, and 8 pt text; each panel is labelled by its letter beneath its colour bar, and the captions below, which the notebook computes, describe the panels.  The map images are rasterised at 300 dpi; glyphs, coastlines, colour bars and text are vectors.  The Earth fields are tapered by exp(-l(l+1)/L^2) (Data, in the introduction of the notebook); the directional kernels of the topography have azimuthal orders |m| < 5.
 
 ## real_fields_01_overview.pdf
 
@@ -21,7 +21,7 @@ Data:
 
 ## real_fields_02_topography.pdf
 
-Size 6.50 x 4.64 inches, 1041 kB.
+Size 6.50 x 4.23 inches, 949 kB.
 
 **Figure 2.** The topography of the Earth, its slope and its ridges, from lifted convolutions of spin 0 to spin 1 and to spin 2.  Top, from left to right: (a) the topography and bathymetry $f$, shown as colour in km on a diverging scale, brown above and green below sea level; (b) the slope of the land $|\eth f_+|/R_\oplus$, shown as colour in metres per kilometre, with the spin-1 field $\eth f_+$ drawn as arrows pointing downhill, whose lengths are proportional to the slope; (c) the ridge strength $\max_\gamma(f_+\circledast\psi)(\cdot,\gamma)$, the largest response of the ridge detector over all orientations, shown as colour on a sequential scale in arbitrary units.  Bottom: orthographic views of (d) the Himalaya and the Tibetan Plateau, centred on 32°N, 85°E, with the land elevation $f_+$ shown as colour in km and the downhill arrows of (b); (e) the same view, with the modulus of the ridge orientation field $|{}_2g|$ shown as colour and ${}_2g$ drawn as headless sticks at the angle $\arg({}_2g)/2$, whose lengths grow in proportion to $|{}_2g|$ from a tenth of the largest length; and (f) the same for the Andes, centred on 20°S, 68°W.  The arrows run down the flanks of the plateau, the ridge strength picks out the Himalaya, the Andes, the Rocky Mountains, the highlands of East Africa and the ice sheets of Greenland and Antarctica, and where the ridge strength is large the sticks lie along the ranges, from east to west along the Himalaya and from north to south along the Andes.
 
@@ -31,7 +31,7 @@ Data:
 
 ## real_fields_03_gravity.pdf
 
-Size 6.50 x 4.62 inches, 1343 kB.
+Size 6.50 x 4.21 inches, 1212 kB.
 
 **Figure 3.** The gravity field of the Earth from EGM2008, as fields of spin 0, 1 and 2 related by lifted convolutions.  Top, from left to right: (a) the geoid height $N$, shown as colour in metres on a diverging scale, red above and blue below the reference ellipsoid; (b) the gravity anomaly $\Delta g=\mathcal{C}_{0\to0}N$, shown as colour in mGal ($10^{-5}$ m s$^{-2}$) on a diverging scale saturated at the 99.5th percentile of its modulus; (c) the modulus of the deflection of the vertical $\varepsilon=\mathcal{C}_{0\to1}N$, shown as colour in arcseconds, with $\varepsilon$ drawn as arrows, which point down the slope of the geoid and whose lengths grow in proportion to $|\varepsilon|$ from 35 per cent of the largest length.  Bottom, orthographic views: (d) the Indian Ocean, centred on 5°S, 80°E, with $N$ shown as colour in metres and $\varepsilon$ drawn as arrows as in (c); (e) the Andes, centred on 20°S, 75°W, with the modulus of the gravity gradients $\Gamma=\mathcal{C}_{0\to2}N$ shown as colour in Eötvös ($10^{-9}$ s$^{-2}$) and $\Gamma$ drawn as headless sticks along the horizontal direction in which the second derivative of the disturbing potential is largest, whose lengths grow in proportion to $|\Gamma|$ from 35 per cent of the largest length; and (f) Indonesia and New Guinea, centred on 5°S, 140°E, with the geoid height recovered from the deflections of the vertical by $\mathcal{C}_{1\to0}$ shown as colour in metres.  The deflections point into the geoid low of the Indian Ocean and away from the geoid high over New Guinea, and the gradients are largest along the Andes and the adjacent trench.  The formula of Vening Meinesz, $\mathcal{C}_{0\to1}$ applied to $\Delta g$, reproduces $\varepsilon$ to a relative error of 1e-16, and the geoid is recovered from $\varepsilon$ and from $\Gamma$ to relative errors of 2e-16 and 1e-16.
 
@@ -41,7 +41,7 @@ Data:
 
 ## real_fields_04_geomagnetism.pdf
 
-Size 6.50 x 4.62 inches, 1153 kB.
+Size 6.50 x 3.80 inches, 1060 kB.
 
 **Figure 4.** The geomagnetic field of IGRF-14 in 2025, as fields of spin 0 and 1, and its downward continuation to the core.  Top, from left to right: (a) the radial field $B_r=\mathcal{C}_{0\to0}v$ at the surface, shown as colour in μT on a diverging scale, blue where the field points into the Earth, as in the northern hemisphere, and red where it points out; (b) the modulus of the horizontal field $\eth v=\mathcal{C}_{0\to1}v$, shown as colour in μT on a sequential scale, with $\eth v$ drawn as arrows in the direction in which a compass needle points, whose lengths grow in proportion to the modulus from 35 per cent of the largest length; (c) the declination, shown as colour in degrees east of geographic north on a diverging scale saturated at ±30°, red to the east and blue to the west, with contours every 10°, solid to the east and dashed to the west, among which the solid contours of 0° are the agonic lines.  Bottom: (d) the inclination, shown as colour in degrees below the horizontal, red where the field dips into the Earth and blue where it points out of it, with the magnetic equator as the contour of zero inclination; (e) the radial field continued by $\mathcal{C}_{0\to0}$ to the boundary between the core and the mantle, shown as colour in mT on a diverging scale as in (a); and (f) an orthographic view of the same boundary centred on the North pole, with the continued radial field shown as colour in mT and the horizontal field continued by $\mathcal{C}_{1\to1}$ drawn as arrows as in (b), with the coastlines projected radially onto the boundary for orientation.  The compass needles point towards the north magnetic pole in the Canadian Arctic, the declination is small over Europe and Africa and changes sign across the agonic lines, and at the core the flux is concentrated in patches at high latitudes, with reversed flux, red in the southern hemisphere, beneath the South Atlantic and southern Africa.
 
@@ -51,7 +51,7 @@ Data:
 
 ## real_fields_05_wind.pdf
 
-Size 6.50 x 4.66 inches, 1494 kB.
+Size 6.50 x 4.25 inches, 1343 kB.
 
 **Figure 5.** The January near-surface wind and its vorticity, divergence and Helmholtz decomposition, from the lifted convolutions $\mathcal{C}_{1\to0}$ and $\mathcal{C}_{0\to1}$.  Top, from left to right: (a) the wind speed $|{}_1f|$, shown as colour in m s$^{-1}$ on a sequential scale, with the wind ${}_1f$ drawn as arrows pointing downwind, whose lengths grow in proportion to the speed from 35 per cent of the largest length; (b) the vorticity $-\mathrm{Im}(\bar\eth\,{}_1f)/R_\oplus$ and (c) the divergence $-\mathrm{Re}(\bar\eth\,{}_1f)/R_\oplus$, each shown as colour in $10^{-5}$ s$^{-1}$ on a diverging scale saturated at the 99.5th percentile of its modulus, so that the extreme values over the steep margins of the Greenland and Antarctic ice sheets do not set the scale, red for anticlockwise rotation and for outflow and blue for clockwise rotation and for inflow.  Bottom: orthographic views of the North Pacific, centred on 20°N, 150°W, of (d) the wind, (e) its divergence-free part and (f) its curl-free part, each with its speed shown as colour in m s$^{-1}$ and drawn as arrows as in (a).  The vorticity is positive in the cyclonic flow around the Aleutian and Icelandic lows and negative in the anticyclones of the northern subtropics, and the divergence is negative along the intertropical convergence zone, into which the trade winds of both hemispheres flow.  The divergence-free part carries the trade winds and the westerlies, the curl-free part carries the flow into the convergence zone and out of the subtropical highs, and the two parts sum to the wind to a relative error of 1e-16.
 
@@ -61,7 +61,7 @@ Data:
 
 ## real_fields_06_wind_smoothing.pdf
 
-Size 6.50 x 8.04 inches, 644 kB.
+Size 6.50 x 6.80 inches, 960 kB.
 
 **Figure 6.** Smoothing the wind as a spin-1 field and as two scalar components.  Orthographic views centred on the strongest wind after smoothing, at 12°N, 40°W, of the wind smoothed by a Gaussian of width $8/L$ radians, each with its speed shown as colour in m s$^{-1}$ on a common sequential scale and drawn as arrows as in Fig. 5.  Top, from left to right: (a) the smoothing by the spin-1 convolution $\mathcal{C}_{1\to1}$, which, with the pole of the coordinates placed at the centre of the view, gives the same result to a relative error of 6e-16; (b) the smoothing of the components $v_\theta$ and $v_\varphi$ as scalar fields in geographic coordinates.  Bottom: (c) the same smoothing of the components with the pole of the coordinates at the centre of the view; and (d) the modulus of the difference between (c) and (a), shown as colour on the same scale, from white to black, with the difference drawn as arrows whose lengths are proportional to its modulus.  The component-wise smoothing agrees closely with the spin-1 smoothing in geographic coordinates, but with the pole at the centre it destroys the flow within about the width of the smoothing of the pole, where the frame turns fastest, with a relative error of 1e-01 over the sphere.
 
@@ -71,7 +71,7 @@ Data:
 
 ## real_fields_07_ocean_currents.pdf
 
-Size 6.50 x 6.41 inches, 1539 kB.
+Size 6.50 x 5.15 inches, 1436 kB.
 
 **Figure 7.** The surface currents of the ocean in 2025, their stream function and their divergence, from the lifted convolution $\mathcal{C}_{1\to0}$.  Top: (a) the current speed $|{}_1f|$, shown as colour in m s$^{-1}$ on a sequential scale, with the current drawn as arrows pointing downstream, whose lengths are proportional to the speed; (b) the stream function $\psi$ of the divergence-free part, shown as colour in $10^6$ m$^2$ s$^{-1}$ on a diverging scale, with twelve equally spaced contours, the streamlines, drawn solid for positive and dashed for negative values.  Bottom: (c) the divergence $-\mathrm{Re}(\bar\eth\,{}_1f)/R_\oplus$, shown as colour in $10^{-7}$ s$^{-1}$ on a diverging scale saturated at the 99.5th percentile of its modulus, red where the surface flow diverges and water upwells and blue where it converges; and (d) an orthographic view of the eastern equatorial Pacific, centred on 5°S, 110°W, with the divergence shown as colour as in (c) and the currents drawn as arrows as in (a).  The fastest currents are the westward equatorial currents of the Pacific, Atlantic and Indian Oceans; the subtropical gyres appear as maxima of $\psi$, red, in the northern hemisphere and minima, blue, in the southern hemisphere; and the divergence is concentrated along the equator in the Pacific and Atlantic and along the coast of Peru, where the equatorial currents diverge from the equator.
 
@@ -92,7 +92,7 @@ Data:
 
 ## real_fields_09_lensing.pdf
 
-Size 6.50 x 6.38 inches, 1923 kB.
+Size 6.50 x 5.76 inches, 2076 kB.
 
 **Figure 9.** The convergence and shear of weak gravitational lensing, related by the lifted convolutions $\mathcal{C}_{0\to2}$ and $\mathcal{C}_{2\to0}$.  Top: (a) the simulated convergence $\kappa$, shown as colour on a diverging scale, red for overdense and blue for underdense regions; (b) the modulus of the shear $\gamma=\mathcal{C}_{0\to2}[\mathcal{D}]\kappa$, shown as colour on a sequential scale.  Bottom: (c) the convergence recovered from the shear by $\mathcal{C}_{2\to0}[\mathcal{D}^{-1}]$, shown as colour on the diverging scale of (a); and (d) an orthographic view, centred on 20°N, 34°E in the coordinates of the simulation, of the convergence smoothed by a Gaussian of width $8/L$ radians, shown as colour on a diverging scale, with the shear smoothed in the same way drawn as headless sticks along the direction in which the images are stretched, at the angle $\arg(\gamma)/2$, whose lengths grow in proportion to $|\gamma|$ from 35 per cent of the largest length.  The smoothing is a multiplier and commutes with $\mathcal{C}_{0\to2}[\mathcal{D}]$, so that the smoothed shear is the shear of the smoothed convergence.  The sticks circle the overdense regions and point away from the underdense regions, and the convergence recovered from the shear reproduces (a) to a relative error of 1e-16, since the simulated convergence has no monopole or dipole.
 
