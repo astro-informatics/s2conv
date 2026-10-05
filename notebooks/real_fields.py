@@ -46,8 +46,10 @@ with app.setup:
     # the figures, their layouts and the captions collected for export
     PRINT = dict(on=False, width=6.5, figures={}, layouts={}, captions={},
                  # diameter of the orthographic views in print, relative to the width of their column: a little smaller
-                 # than the column, and, in a row with maps, about as tall as the maps beside it with their colour bars
-                 ortho_scale={"default": 0.82, "04_geomagnetism": 0.62, "07_ocean_currents": 0.62})
+                 # than the column, and 0.62 in the figures of two columns and beside maps, so that a row with maps is
+                 # about as tall as the maps with their colour bars, and the views of those figures all have the same size
+                 ortho_scale={"default": 0.82, "04_geomagnetism": 0.62, "06_wind_smoothing": 0.62,
+                              "07_ocean_currents": 0.62, "09_lensing": 0.62})
 
 
 @app.cell(hide_code=True)
