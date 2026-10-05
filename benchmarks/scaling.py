@@ -20,7 +20,8 @@ repository root, for example::
 
 It prints the provenance of the run and a markdown table of the times and fitted exponents, and
 optionally writes them, with every run time and the system information, as JSON, and the plot
-as PDF, which needs matplotlib.
+as PDF, which needs matplotlib.  ``--replot scaling.json --plot scaling.pdf`` redraws the plot of a
+recorded run without timing again.
 """
 
 import argparse
@@ -148,49 +149,50 @@ def markdown_table(
     return "\n".join(lines)
 
 
-def plot(
-    medians: dict, labels: dict, exponents: dict, bandlimits: list, path: str
-) -> None:
-    """Plot the times, and the times divided by L^3, against band-limit on logarithmic axes."""
+def plot(medians: dict, labels: dict, bandlimits: list, path: str) -> None:
+    """Plot the times against band-limit on logarithmic axes, with an L^3 reference."""
     import matplotlib
     import numpy as np
     from matplotlib.figure import Figure
-    from matplotlib.ticker import FuncFormatter, LogLocator, NullLocator
+    from matplotlib.ticker import NullLocator
 
     L = np.array(bandlimits, dtype=float)
     markers = "osD^vP*X"  # distinct in greyscale too
     with matplotlib.rc_context({"font.size": 8, "pdf.fonttype": 42}):
-        fig = Figure(figsize=(6.5, 2.6), layout="constrained")
-        ax_time, ax_scaled = fig.subplots(1, 2)
+        fig = Figure(figsize=(4, 3), layout="constrained")
+        ax = fig.subplots()
         for (name, label), marker in zip(labels.items(), markers, strict=False):
             seconds = np.array([medians[name][b] for b in bandlimits])
-            fit = exponents[name]
-            legend = label if fit is None else rf"{label}: $\propto L^{{{fit[0]:.2f}}}$"
-            style = {"marker": marker, "markersize": 3, "linewidth": 1}
-            ax_time.loglog(L, seconds, label=legend, **style)
-            ax_scaled.loglog(L, 1e9 * seconds / L**3, **style)
+            ax.loglog(L, seconds, marker=marker, markersize=3, linewidth=1, label=label)
         # the reference slope, above the slowest operator
         slowest = max(medians[name][bandlimits[-1]] for name in labels)
         reference = 2 * slowest * (L / L[-1]) ** 3
-        ax_time.loglog(
-            L, reference, ":", color="0.4", linewidth=1, label=r"$\propto L^3$"
-        )
+        ax.loglog(L, reference, ":", color="0.4", linewidth=1, label=r"$\propto L^3$")
         ticks = [
             b for b in bandlimits if b & (b - 1) == 0
         ] or bandlimits  # powers of two
-        for ax, letter in ((ax_time, "a"), (ax_scaled, "b")):
-            ax.set_xticks(ticks, [str(b) for b in ticks])
-            ax.xaxis.set_minor_locator(NullLocator())
-            ax.set_xlabel(f"band-limit $L$\n({letter})")
-        ax_scaled.yaxis.set_major_locator(LogLocator(subs=(1.0, 2.0, 5.0)))
-        ax_scaled.yaxis.set_minor_locator(NullLocator())
-        ax_scaled.yaxis.set_major_formatter(
-            FuncFormatter(lambda value, _: f"{value:g}")
-        )
-        ax_time.set_ylabel("time (s)")
-        ax_scaled.set_ylabel("time / $L^3$ (ns)")
-        ax_time.legend(frameon=False)
+        ax.set_xticks(ticks, [str(b) for b in ticks])
+        ax.xaxis.set_minor_locator(NullLocator())
+        ax.set_xlabel("band-limit $L$")
+        ax.set_ylabel("time (s)")
+        ax.legend(frameon=False)
         fig.savefig(path)
+
+
+def replot(record: str, path: str, plot_from: int) -> None:
+    """Plot the times of a recorded run, from the band-limit plot_from, without timing."""
+    with open(record) as file:
+        data = json.load(file)
+    names = data["arguments"]["operators"]
+    bandlimits = [L for L in data["arguments"]["bandlimits"] if L >= plot_from]
+    medians = {
+        name: {L: data["median_seconds"][name][str(L)] for L in bandlimits}
+        for name in names
+    }
+    labels = {
+        name: OPERATORS.get(name, data["operators"][name]["label"]) for name in names
+    }
+    plot(medians, labels, bandlimits, path)
 
 
 def parse_args(argv=None):
@@ -257,6 +259,18 @@ def parse_args(argv=None):
     parser.add_argument(
         "--plot", default=None, help="write the plot to this file, such as scaling.pdf"
     )
+    parser.add_argument(
+        "--plot-from",
+        type=int,
+        default=16,
+        help="smallest band-limit of the plot (default 16)",
+    )
+    parser.add_argument(
+        "--replot",
+        default=None,
+        metavar="JSON",
+        help="plot the times recorded in this JSON file to --plot, without timing",
+    )
     args = parser.parse_args(argv)
     args.bandlimits = sorted(set(args.bandlimits))
     if args.bandlimits[0] < N:
@@ -267,6 +281,10 @@ def parse_args(argv=None):
 def main(argv=None):
     """Run the benchmark and report the results."""
     args = parse_args(argv)
+    if args.replot:
+        if not args.plot:
+            raise SystemExit("--replot needs --plot")
+        return replot(args.replot, args.plot, args.plot_from)
     hardware = use_one_core(args.core) if args.device == "cpu" else {"kind": "default"}
     import jax
 
@@ -354,7 +372,12 @@ def main(argv=None):
         with open(args.output, "w") as file:
             json.dump(record, file, indent=2)
     if args.plot:
-        plot(medians, labels, exponents, args.bandlimits, args.plot)
+        plot(
+            medians,
+            labels,
+            [L for L in args.bandlimits if L >= args.plot_from],
+            args.plot,
+        )
 
 
 if __name__ == "__main__":

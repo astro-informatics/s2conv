@@ -21,8 +21,8 @@ instead, such as a GPU, on which the time grows more slowly than :math:`L^3` unt
 band-limit is large enough to occupy the hardware.  The script fits a power law to the times
 from :math:`L = 32` up, prints a markdown table of the times and the fitted exponents, and
 writes them as JSON and the plot as PDF, with the times on logarithmic axes against an
-:math:`L^3` reference and the times divided by :math:`L^3`, which level off for cubic scaling.
-Like the equivariance benchmark, it records the git commits of the code that ran.
+:math:`L^3` reference, from :math:`L = 16`.  ``--replot scaling.json --plot scaling.pdf`` redraws the
+plot from a recorded run without timing again.  Like the equivariance benchmark, it records the git commits of the code that ran.
 ``python benchmarks/scaling.py --help`` lists the options, including the band-limits, the
 operators and the number of runs.
 

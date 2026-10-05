@@ -38,7 +38,7 @@ The outputs of `benchmarks/scaling.py`:
 |:--|:--|
 | `scaling.md` | The printed output: two provenance lines and the table of times and fitted exponents |
 | `scaling.json` | Every run time, the medians and the fits, with the arguments, the system, the hardware and the git commits of the code |
-| `scaling.pdf` | The plot: (a) the times against band-limit on logarithmic axes, with an L³ reference; (b) the times divided by L³ |
+| `scaling.pdf` | The plot: the times against band-limit from L = 16 on logarithmic axes, with an L³ reference |
 
 They were produced on 1 October 2026 by running, from the repository root,
 
