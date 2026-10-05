@@ -1,6 +1,6 @@
 # Figures of the notebook real_fields.py
 
-Produced by `notebooks/export_real_fields_figures.py` from s2conv commit `9d4f56838f7e798e77eaa9febc17192ac6f3f2e7`, at band-limit L = 64, the default of the notebook.  Each figure is 6.5 inches wide, with at most three panels per row, each as wide as its column, and 8 pt text; each panel is labelled by its letter beneath its colour bar, and the captions below, which the notebook computes, describe the panels.  The map images are rasterised at 300 dpi; glyphs, coastlines, colour bars and text are vectors.  The Earth fields are tapered by exp(-l(l+1)/L^2) (Data, in the introduction of the notebook); the directional kernels of the topography have azimuthal orders |m| < 5.
+Produced by `notebooks/export_real_fields_figures.py` from s2conv commit `fc8ffef300cc2fc5bc6450c0896b65a8c2f23596`, at band-limit L = 64, the default of the notebook.  Each figure is 6.5 inches wide, with at most three panels per row, each as wide as its column, and 8 pt text; each panel is labelled by its letter beneath its colour bar, and the captions below, which the notebook computes, describe the panels.  The map images are rasterised at 300 dpi; glyphs, coastlines, colour bars and text are vectors.  The Earth fields are tapered by exp(-l(l+1)/L^2) (Data, in the introduction of the notebook); the directional kernels of the topography have azimuthal orders |m| < 5.
 
 ## real_fields_01_overview.pdf
 
@@ -61,7 +61,7 @@ Data:
 
 ## real_fields_06_wind_smoothing.pdf
 
-Size 6.50 x 6.80 inches, 960 kB.
+Size 6.50 x 5.53 inches, 696 kB.
 
 **Figure 6.** Smoothing the wind as a spin-1 field and as two scalar components.  Orthographic views centred on the strongest wind after smoothing, at 12°N, 40°W, of the wind smoothed by a Gaussian of width $8/L$ radians, each with its speed shown as colour in m s$^{-1}$ on a common sequential scale and drawn as arrows as in Fig. 5.  Top, from left to right: (a) the smoothing by the spin-1 convolution $\mathcal{C}_{1\to1}$, which, with the pole of the coordinates placed at the centre of the view, gives the same result to a relative error of 6e-16; (b) the smoothing of the components $v_\theta$ and $v_\varphi$ as scalar fields in geographic coordinates.  Bottom: (c) the same smoothing of the components with the pole of the coordinates at the centre of the view; and (d) the modulus of the difference between (c) and (a), shown as colour on the same scale, from white to black, with the difference drawn as arrows whose lengths are proportional to its modulus.  The component-wise smoothing agrees closely with the spin-1 smoothing in geographic coordinates, but with the pole at the centre it destroys the flow within about the width of the smoothing of the pole, where the frame turns fastest, with a relative error of 1e-01 over the sphere.
 
@@ -92,7 +92,7 @@ Data:
 
 ## real_fields_09_lensing.pdf
 
-Size 6.50 x 5.76 inches, 2076 kB.
+Size 6.50 x 5.13 inches, 1978 kB.
 
 **Figure 9.** The convergence and shear of weak gravitational lensing, related by the lifted convolutions $\mathcal{C}_{0\to2}$ and $\mathcal{C}_{2\to0}$.  Top: (a) the simulated convergence $\kappa$, shown as colour on a diverging scale, red for overdense and blue for underdense regions; (b) the modulus of the shear $\gamma=\mathcal{C}_{0\to2}[\mathcal{D}]\kappa$, shown as colour on a sequential scale.  Bottom: (c) the convergence recovered from the shear by $\mathcal{C}_{2\to0}[\mathcal{D}^{-1}]$, shown as colour on the diverging scale of (a); and (d) an orthographic view, centred on 20°N, 34°E in the coordinates of the simulation, of the convergence smoothed by a Gaussian of width $8/L$ radians, shown as colour on a diverging scale, with the shear smoothed in the same way drawn as headless sticks along the direction in which the images are stretched, at the angle $\arg(\gamma)/2$, whose lengths grow in proportion to $|\gamma|$ from 35 per cent of the largest length.  The smoothing is a multiplier and commutes with $\mathcal{C}_{0\to2}[\mathcal{D}]$, so that the smoothed shear is the shear of the smoothed convergence.  The sticks circle the overdense regions and point away from the underdense regions, and the convergence recovered from the shear reproduces (a) to a relative error of 1e-16, since the simulated convergence has no monopole or dipole.
 
