@@ -45,6 +45,9 @@ with app.setup:
     # three panels per row, each as wide as its column, 8 pt text and the panel letters beneath the colour bars, and
     # the figures, their layouts and the captions collected for export
     PRINT = dict(on=False, width=6.5, figures={}, layouts={}, captions={},
+                 # panel mode, for subcaptions in LaTeX: every panel is its own figure, with no letter, at the width in
+                 # inches given for it in panel_widths, and is collected in panel_figures
+                 panels=False, panel_widths={}, panel_figures={},
                  # diameter of the orthographic views in print, relative to the width of their column: a little smaller
                  # than the column, and 0.62 in the figures of two columns and beside maps, so that a row with maps is
                  # about as tall as the maps with their colour bars, and the views of those figures all have the same size
@@ -311,6 +314,17 @@ def panels(name, width, height, rows, print_rows=None):
     orthographic view, and a row shorter than the longest is centred.  On screen the figure is width by height inches.
     In print mode it is at the text width of the article, with the rows of print_rows if given, and is collected
     under name for export, where fit_height sets its height so that every panel fills the width of its column."""
+    if PRINT["on"] and PRINT["panels"]:
+        # one figure per panel, in reading order, at the width it occupies in the article; fit_panel sets its height
+        projections = [projection for row in rows for projection in row]
+        widths = PRINT["panel_widths"][name]
+        assert len(widths) == len(projections), name
+        figs, axes = [], []
+        for projection, panel_width in zip(projections, widths):
+            figs.append(Figure(figsize=(panel_width, panel_width), layout="constrained"))
+            axes.append(figs[-1].add_subplot(projection=projection))
+        PRINT["panel_figures"][name] = list(zip(figs, axes, projections))
+        return figs[0], axes
     if PRINT["on"]:
         rows = print_rows or rows
         fig = Figure(figsize=(PRINT["width"], height * PRINT["width"] / width), layout="constrained")
@@ -367,6 +381,22 @@ def fit_height(name, rounds=4):
 
 
 @app.function
+def fit_panel(name, rounds=4):
+    """Set the height of each single-panel figure of panel mode, so that a map has its 2:1 shape across the width of
+    the figure and an orthographic view has the diameter PRINT["ortho_scale"] relative to that width, with the colour
+    bar beneath.  To be called once the figures are drawn."""
+    scale = PRINT["ortho_scale"].get(name, PRINT["ortho_scale"]["default"])
+    for fig, ax, projection in PRINT["panel_figures"][name]:
+        for _ in range(rounds):
+            fig.draw_without_rendering()
+            width, height = fig.get_size_inches()
+            box = ax.get_position(original=True)
+            target = 0.5 * box.width * width if projection == "mollweide" else scale * width
+            fig.set_size_inches(width, height + target - box.height * height)
+        fig.draw_without_rendering()
+
+
+@app.function
 def caption(name, text, print_wording=()):
     """The caption of a figure as markdown, collected under name for export.  In print mode, each pair (old, new) of
     print_wording replaces the wording of the screen layout by that of the print layout."""
@@ -388,7 +418,7 @@ def panel_title(ax, title):
 @app.function
 def panel_letter(title):
     """The letter of a panel, e.g. "(a)", from its title, in print mode; otherwise None."""
-    if PRINT["on"] and title and title.startswith("("):
+    if PRINT["on"] and not PRINT["panels"] and title and title.startswith("("):
         return title[: title.index(")") + 1]
     return None
 
@@ -415,6 +445,13 @@ def colour_bar(ax, image, label, letter=None):
                                  aspect=25 if PRINT["on"] else 30, pad=0.03)
     bar.set_label(label if letter is None else f"{label}\n{letter}", fontsize=8)
     bar.locator = matplotlib.ticker.MaxNLocator(nbins=4 if PRINT["on"] else 6, symmetric=bool(image.norm.vmin < 0))
+    power = int(np.floor(np.log10(max(abs(image.norm.vmin), abs(image.norm.vmax), 1e-300))))
+    if PRINT["on"] and not -2 <= power <= 3:
+        # in print, small or large values as mantissas, with their power of ten in the label, so that the ticks of a
+        # narrow colour bar do not crowd
+        bar.formatter = matplotlib.ticker.FuncFormatter(lambda x, _: f"{x / 10**power:g}".replace("-", "\u2212"))
+        label = f"$10^{{{power}}}$" if label == "dimensionless" else f"$10^{{{power}}}$ {label}"
+        bar.set_label(label if letter is None else f"{label}\n{letter}", fontsize=8)
     bar.update_ticks()
     bar.ax.tick_params(labelsize=8 if PRINT["on"] else 7)
 
