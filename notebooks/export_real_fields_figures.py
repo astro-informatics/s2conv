@@ -66,7 +66,7 @@ PANELS = {
     "05_wind": [("abc", THREE), ("def", THREE)],
     "06_wind_smoothing": [("ab", TWO), ("cd", TWO)],
     "07_ocean_currents": [("ab", TWO), ("cd", TWO)],
-    "08_cmb_polarisation": [("ab", TWO), ("cde", THREE)],
+    "08_cmb_polarisation": [("ab", THREE), ("cde", THREE)],
     "09_lensing": [("ab", TWO), ("cd", TWO)],
 }
 
