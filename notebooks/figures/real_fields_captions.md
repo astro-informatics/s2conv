@@ -1,6 +1,6 @@
 # Figures of the notebook real_fields.py
 
-Produced by `notebooks/export_real_fields_figures.py` from s2conv commit `60bb341b3285464b0ea6eb5fe9acd38bc6b57d5c`, at band-limit L = 64, the default of the notebook.  Each figure is 6.5 inches wide, with at most three panels per row, each as wide as its column, and 8 pt text; each panel is labelled by its letter beneath its colour bar, and the captions below, which the notebook computes, describe the panels.  The map images are rasterised at 300 dpi; glyphs, coastlines, colour bars and text are vectors.  The Earth fields are tapered by exp(-l(l+1)/L^2) (Data, in the introduction of the notebook); the directional kernels of the topography have azimuthal orders |m| < 5.
+Produced by `notebooks/export_real_fields_figures.py` from s2conv commit `dc9dbf126d22374842bdb4b582781107535ee8df`, at band-limit L = 64, the default of the notebook.  Each figure is 6.5 inches wide, with at most three panels per row, each as wide as its column, and 8 pt text; each panel is labelled by its letter beneath its colour bar, and the captions below, which the notebook computes, describe the panels.  The map images are rasterised at 300 dpi; glyphs, coastlines, colour bars and text are vectors.  The Earth fields are tapered by exp(-l(l+1)/L^2) (Data, in the introduction of the notebook); the directional kernels of the topography have azimuthal orders |m| < 5.
 
 ## real_fields_01_overview.pdf
 
@@ -164,10 +164,10 @@ Each panel is also saved as its own PDF, real_fields_NN_name_x.pdf for panel (x)
 - `real_fields_07_ocean_currents_c.pdf`: 2.64 x 1.88 inches, 324 kB
 - `real_fields_07_ocean_currents_d.pdf`: 2.64 x 2.25 inches, 188 kB
 
-## real_fields_08_cmb_polarisation: rows (a,b) at 2.64 in, (c,d,e) at 1.76 in
+## real_fields_08_cmb_polarisation: rows (a,b) at 1.76 in, (c,d,e) at 1.76 in
 
-- `real_fields_08_cmb_polarisation_a.pdf`: 2.64 x 1.86 inches, 410 kB
-- `real_fields_08_cmb_polarisation_b.pdf`: 2.64 x 1.86 inches, 360 kB
+- `real_fields_08_cmb_polarisation_a.pdf`: 1.76 x 1.38 inches, 214 kB
+- `real_fields_08_cmb_polarisation_b.pdf`: 1.76 x 1.38 inches, 191 kB
 - `real_fields_08_cmb_polarisation_c.pdf`: 1.76 x 1.38 inches, 182 kB
 - `real_fields_08_cmb_polarisation_d.pdf`: 1.76 x 1.38 inches, 183 kB
 - `real_fields_08_cmb_polarisation_e.pdf`: 1.76 x 1.38 inches, 191 kB
