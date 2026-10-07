@@ -1,10 +1,10 @@
 # Figures of the notebook real_fields.py
 
-Produced by `notebooks/export_real_fields_figures.py` from s2conv commit `fc8ffef300cc2fc5bc6450c0896b65a8c2f23596`, at band-limit L = 64, the default of the notebook.  Each figure is 6.5 inches wide, with at most three panels per row, each as wide as its column, and 8 pt text; each panel is labelled by its letter beneath its colour bar, and the captions below, which the notebook computes, describe the panels.  The map images are rasterised at 300 dpi; glyphs, coastlines, colour bars and text are vectors.  The Earth fields are tapered by exp(-l(l+1)/L^2) (Data, in the introduction of the notebook); the directional kernels of the topography have azimuthal orders |m| < 5.
+Produced by `notebooks/export_real_fields_figures.py` from s2conv commit `60bb341b3285464b0ea6eb5fe9acd38bc6b57d5c`, at band-limit L = 64, the default of the notebook.  Each figure is 6.5 inches wide, with at most three panels per row, each as wide as its column, and 8 pt text; each panel is labelled by its letter beneath its colour bar, and the captions below, which the notebook computes, describe the panels.  The map images are rasterised at 300 dpi; glyphs, coastlines, colour bars and text are vectors.  The Earth fields are tapered by exp(-l(l+1)/L^2) (Data, in the introduction of the notebook); the directional kernels of the topography have azimuthal orders |m| < 5.
 
 ## real_fields_01_overview.pdf
 
-Size 6.50 x 5.36 inches, 1631 kB.
+Size 6.50 x 5.37 inches, 1622 kB.
 
 **Figure 1.** Fields of spin 0, 1 and 2 on the Earth and on the sky, the examples of this notebook.  Top, from left to right: (a) the height of the land and the depth of the ocean floor, a scalar field, shown as colour in km, brown above and green below sea level; (b) the deflection of the vertical, the small angle, of a few arcseconds, by which the direction of gravity, i.e. of a plumb line, differs from the vertical of an idealised smooth Earth because of the uneven distribution of mass within the Earth, a spin-1 field, with its size shown as colour and its direction drawn as arrows; (c) the horizontal part of the Earth's magnetic field in 2025, the field that aligns a compass needle, a spin-1 field, with its strength shown as colour in μT and its direction drawn as arrows.  Middle: (d) the wind near the surface in January, averaged over thirty years, a spin-1 field, with the wind speed shown as colour and the direction in which the wind blows drawn as arrows; (e) the currents at the surface of the ocean in 2025, a spin-1 field, with their speed shown as colour and the direction in which the water flows drawn as arrows, whose lengths are proportional to the speed.  Bottom: (f) the cosmic microwave background, the light emitted by the early Universe, as measured by the Planck satellite, with the variations of its temperature, a scalar field, shown as colour in μK, and the direction of its polarisation, a spin-2 field, drawn as headless sticks, in coordinates in which the plane of our Galaxy lies along the equator of the map; and (g) a simulation of the weak gravitational lensing of distant galaxies by the matter in the Universe, with the projected density of matter, the convergence, a scalar field, shown as colour, red where it is higher and blue where it is lower than the mean, and the shear, the direction in which the images of the galaxies are stretched, a spin-2 field, drawn as headless sticks, which circle the concentrations of mass.  The fields of (f) and (g) are smoothed so that the sticks follow their large-scale patterns, and, unless stated otherwise, the lengths of the arrows and sticks grow with the size of the field.  The fields are described in detail, with the lifted convolutions that act on them, in Figs. 2 (topography), 3 (gravity), 4 (magnetic field), 5 (wind), 7 (ocean currents), 8 (CMB) and 9 (lensing).
 
@@ -92,10 +92,89 @@ Data:
 
 ## real_fields_09_lensing.pdf
 
-Size 6.50 x 5.13 inches, 1978 kB.
+Size 6.50 x 5.15 inches, 1975 kB.
 
 **Figure 9.** The convergence and shear of weak gravitational lensing, related by the lifted convolutions $\mathcal{C}_{0\to2}$ and $\mathcal{C}_{2\to0}$.  Top: (a) the simulated convergence $\kappa$, shown as colour on a diverging scale, red for overdense and blue for underdense regions; (b) the modulus of the shear $\gamma=\mathcal{C}_{0\to2}[\mathcal{D}]\kappa$, shown as colour on a sequential scale.  Bottom: (c) the convergence recovered from the shear by $\mathcal{C}_{2\to0}[\mathcal{D}^{-1}]$, shown as colour on the diverging scale of (a); and (d) an orthographic view, centred on 20°N, 34°E in the coordinates of the simulation, of the convergence smoothed by a Gaussian of width $8/L$ radians, shown as colour on a diverging scale, with the shear smoothed in the same way drawn as headless sticks along the direction in which the images are stretched, at the angle $\arg(\gamma)/2$, whose lengths grow in proportion to $|\gamma|$ from 35 per cent of the largest length.  The smoothing is a multiplier and commutes with $\mathcal{C}_{0\to2}[\mathcal{D}]$, so that the smoothed shear is the shear of the smoothed convergence.  The sticks circle the overdense regions and point away from the underdense regions, and the convergence recovered from the shear reproduces (a) to a relative error of 1e-16, since the simulated convergence has no monopole or dipole.
 
 Data:
 
 - `convergence.npz` (spin 0, stored at L = 128, dimensionless): Limber power spectrum of the CAMB non-linear matter power spectrum (HMcode 2020) for the Planck 2018 cosmology and a Euclid-like source distribution with median redshift 0.9; shifted lognormal field (shift 0.025); licence: Generated, CC0
+
+# Panels
+
+Each panel is also saved as its own PDF, real_fields_NN_name_x.pdf for panel (x), without its letter, for subcaptions in LaTeX, at the width it occupies in the article (text width 5.5 inches): 1.76 inches for three panels to a row and 2.64 for two, with its colour bar and unit beneath it.  Maps keep their 2:1 shape across the width of the panel; the orthographic views have diameters of 0.62 of the width of the panel in Figs. 4(f), 6, 7(d) and 9(d), and 0.82 elsewhere.
+
+## real_fields_01_overview: rows (a,b,c) at 1.76 in, (d,e) at 1.76 in, (f,g) at 1.76 in
+
+- `real_fields_01_overview_a.pdf`: 1.76 x 1.39 inches, 178 kB
+- `real_fields_01_overview_b.pdf`: 1.76 x 1.38 inches, 185 kB
+- `real_fields_01_overview_c.pdf`: 1.76 x 1.38 inches, 142 kB
+- `real_fields_01_overview_d.pdf`: 1.76 x 1.40 inches, 196 kB
+- `real_fields_01_overview_e.pdf`: 1.76 x 1.40 inches, 164 kB
+- `real_fields_01_overview_f.pdf`: 1.76 x 1.38 inches, 209 kB
+- `real_fields_01_overview_g.pdf`: 1.76 x 1.40 inches, 164 kB
+
+## real_fields_02_topography: rows (a,b,c) at 1.76 in, (d,e,f) at 1.76 in
+
+- `real_fields_02_topography_a.pdf`: 1.76 x 1.39 inches, 178 kB
+- `real_fields_02_topography_b.pdf`: 1.76 x 1.39 inches, 165 kB
+- `real_fields_02_topography_c.pdf`: 1.76 x 1.39 inches, 97 kB
+- `real_fields_02_topography_d.pdf`: 1.76 x 2.01 inches, 110 kB
+- `real_fields_02_topography_e.pdf`: 1.76 x 2.01 inches, 119 kB
+- `real_fields_02_topography_f.pdf`: 1.76 x 2.01 inches, 105 kB
+
+## real_fields_03_gravity: rows (a,b,c) at 1.76 in, (d,e,f) at 1.76 in
+
+- `real_fields_03_gravity_a.pdf`: 1.76 x 1.38 inches, 151 kB
+- `real_fields_03_gravity_b.pdf`: 1.76 x 1.39 inches, 211 kB
+- `real_fields_03_gravity_c.pdf`: 1.76 x 1.38 inches, 195 kB
+- `real_fields_03_gravity_d.pdf`: 1.76 x 2.00 inches, 139 kB
+- `real_fields_03_gravity_e.pdf`: 1.76 x 2.00 inches, 134 kB
+- `real_fields_03_gravity_f.pdf`: 1.76 x 2.00 inches, 131 kB
+
+## real_fields_04_geomagnetism: rows (a,b,c) at 1.76 in, (d,e,f) at 1.76 in
+
+- `real_fields_04_geomagnetism_a.pdf`: 1.76 x 1.38 inches, 125 kB
+- `real_fields_04_geomagnetism_b.pdf`: 1.76 x 1.38 inches, 145 kB
+- `real_fields_04_geomagnetism_c.pdf`: 1.76 x 1.39 inches, 166 kB
+- `real_fields_04_geomagnetism_d.pdf`: 1.76 x 1.39 inches, 126 kB
+- `real_fields_04_geomagnetism_e.pdf`: 1.76 x 1.38 inches, 166 kB
+- `real_fields_04_geomagnetism_f.pdf`: 1.76 x 1.64 inches, 112 kB
+
+## real_fields_05_wind: rows (a,b,c) at 1.76 in, (d,e,f) at 1.76 in
+
+- `real_fields_05_wind_a.pdf`: 1.76 x 1.40 inches, 202 kB
+- `real_fields_05_wind_b.pdf`: 1.76 x 1.40 inches, 193 kB
+- `real_fields_05_wind_c.pdf`: 1.76 x 1.40 inches, 189 kB
+- `real_fields_05_wind_d.pdf`: 1.76 x 2.03 inches, 165 kB
+- `real_fields_05_wind_e.pdf`: 1.76 x 2.03 inches, 158 kB
+- `real_fields_05_wind_f.pdf`: 1.76 x 2.03 inches, 146 kB
+
+## real_fields_06_wind_smoothing: rows (a,b) at 2.64 in, (c,d) at 2.64 in
+
+- `real_fields_06_wind_smoothing_a.pdf`: 2.64 x 2.25 inches, 174 kB
+- `real_fields_06_wind_smoothing_b.pdf`: 2.64 x 2.25 inches, 175 kB
+- `real_fields_06_wind_smoothing_c.pdf`: 2.64 x 2.25 inches, 175 kB
+- `real_fields_06_wind_smoothing_d.pdf`: 2.64 x 2.25 inches, 73 kB
+
+## real_fields_07_ocean_currents: rows (a,b) at 2.64 in, (c,d) at 2.64 in
+
+- `real_fields_07_ocean_currents_a.pdf`: 2.64 x 1.88 inches, 277 kB
+- `real_fields_07_ocean_currents_b.pdf`: 2.64 x 1.88 inches, 313 kB
+- `real_fields_07_ocean_currents_c.pdf`: 2.64 x 1.88 inches, 324 kB
+- `real_fields_07_ocean_currents_d.pdf`: 2.64 x 2.25 inches, 188 kB
+
+## real_fields_08_cmb_polarisation: rows (a,b) at 2.64 in, (c,d,e) at 1.76 in
+
+- `real_fields_08_cmb_polarisation_a.pdf`: 2.64 x 1.86 inches, 410 kB
+- `real_fields_08_cmb_polarisation_b.pdf`: 2.64 x 1.86 inches, 360 kB
+- `real_fields_08_cmb_polarisation_c.pdf`: 1.76 x 1.38 inches, 182 kB
+- `real_fields_08_cmb_polarisation_d.pdf`: 1.76 x 1.38 inches, 183 kB
+- `real_fields_08_cmb_polarisation_e.pdf`: 1.76 x 1.38 inches, 191 kB
+
+## real_fields_09_lensing: rows (a,b) at 2.64 in, (c,d) at 2.64 in
+
+- `real_fields_09_lensing_a.pdf`: 2.64 x 1.88 inches, 414 kB
+- `real_fields_09_lensing_b.pdf`: 2.64 x 1.88 inches, 406 kB
+- `real_fields_09_lensing_c.pdf`: 2.64 x 1.88 inches, 414 kB
+- `real_fields_09_lensing_d.pdf`: 2.64 x 2.25 inches, 171 kB
