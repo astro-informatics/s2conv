@@ -217,7 +217,7 @@ def _(seed):
         _errs.append(rel_err(transforms.wigner_forward(lifting.lift_samples(transforms.inverse(_f, _L, _s), _s, 4), _L, 4), lifting.lift(_f, _s, 4)))
     conventions_rows.append(
         dict(
-            paper="Lemma IV.7(c), Eq. (39)",
+            paper="Lemma IV.7(c), Eq. (38)",
             check="lift on the $\\mathrm{SO}(3)$ grid + `transforms.wigner_forward` vs the column $n=-s$, $s=0,2,-3$",
             error=max(_errs),
         )
@@ -227,7 +227,7 @@ def _(seed):
     _Fs = transforms.wigner_inverse(_G, _L, 4)
     conventions_rows.append(
         dict(
-            paper="Lemma IV.7(c), Eq. (39)",
+            paper="Lemma IV.7(c), Eq. (38)",
             check="fibre integral of Wigner samples + spin transform vs reading the column $n=-s$, $s=0,2,-3$",
             error=max(rel_err(transforms.forward(lifting.project_samples(_Fs, _s), _L, _s), lifting.project(_G, _s)) for _s in (0, 2, -3)),
         )
@@ -252,7 +252,7 @@ def _():
 
     $$(\Lambda_s f)(\alpha,\beta,\gamma)=\tfrac{1}{\sqrt{2\pi}}\,e^{-\mathrm{i}s\gamma}f(\beta,\alpha),\qquad(\Lambda_s^\dagger F)(\beta,\alpha)=\tfrac{1}{\sqrt{2\pi}}\int_0^{2\pi}e^{\mathrm{i}s\gamma}F(\alpha,\beta,\gamma)\,\mathrm{d}\gamma.$$
 
-    In harmonic space the lift fills the single Wigner column $n=-s$ and the projection reads it back (Lemma IV.7(c), Eq. 39):
+    In harmonic space the lift fills the single Wigner column $n=-s$ and the projection reads it back (Lemma IV.7(c), Eq. 38):
 
     $$(\Lambda_s f)^{\ell}_{mn}=(-1)^s\sqrt{\tfrac{8\pi^2}{2\ell+1}}\;{}_sf_{\ell m}\,\delta_{n,-s},\qquad(\Lambda^\dagger_s F)_{\ell m}=(-1)^s\sqrt{\tfrac{2\ell+1}{8\pi^2}}\;F^{\ell}_{m,-s}.$$
 
@@ -388,22 +388,22 @@ def _(ell_ui, s_ui, seed, sp_ui):
 
     framework_rows = [
         dict(
-            paper="Thm V.2, Eq. (44)",
+            paper="Thm V.2, Eq. (43)",
             check=f"$\\mathcal{{C}}_{{{_s}\\to{_sp}}}$: literal (lift on grid, Wigner, group convolution, fibre integral) vs closed form",
             error=rel_err(transforms.forward(lifted_conv_literal(_f_samples, _PsiN, _s, _sp, _N), _L, _sp), theorem_v2(_f, _PsiN, _s, _sp)),
         ),
         dict(
-            paper="Thm V.2, Eq. (43)",
+            paper="Thm V.2, Eq. (42)",
             check=f"$\\mathcal{{C}}_{{{_s}\\to G}}$: literal vs closed form",
             error=rel_err(transforms.wigner_forward(lifted_conv_literal(_f_samples, _PsiN, _s, "G", _N), _L, _N), theorem_v2(_f, _PsiN, _s, "G", _N)),
         ),
         dict(
-            paper="Thm V.2, Eq. (45)",
+            paper="Thm V.2, Eq. (44)",
             check=f"$\\mathcal{{C}}_{{G\\to{_sp}}}$: literal vs closed form",
             error=rel_err(transforms.forward(lifted_conv_literal(_F_samples, _PsiN, "G", _sp, _N), _L, _sp), theorem_v2(_F, _PsiN, "G", _sp)),
         ),
         dict(
-            paper="Thm V.2, Eq. (46)",
+            paper="Thm V.2, Eq. (45)",
             check="$\\mathcal{C}_{G\\to G}$: literal vs closed form",
             error=rel_err(transforms.wigner_forward(lifted_conv_literal(_F_samples, _PsiN, "G", "G", _N), _L, _N), theorem_v2(_F, _PsiN, "G", "G", _N)),
         ),
@@ -443,10 +443,10 @@ def _(ell_ui, s_ui, seed, sp_ui):
 
     _fig = Figure(figsize=(12, 3.2), layout="constrained")
     _panels = [
-        (f"$\\mathcal{{C}}_{{{_s}\\to{_sp}}}$: entry $({-_sp},{-_s})$, Eq. (44)", [("entry", (-_sp, -_s))]),
-        (f"$\\mathcal{{C}}_{{{_s}\\to G}}$: column $k={-_s}$, Eq. (43)", [("column", -_s)]),
-        (f"$\\mathcal{{C}}_{{G\\to{_sp}}}$: row $n={-_sp}$, Eq. (45)", [("row", -_sp)]),
-        ("$\\mathcal{C}_{G\\to G}$: whole block, Eq. (46)", [("all", None)]),
+        (f"$\\mathcal{{C}}_{{{_s}\\to{_sp}}}$: entry $({-_sp},{-_s})$, Eq. (43)", [("entry", (-_sp, -_s))]),
+        (f"$\\mathcal{{C}}_{{{_s}\\to G}}$: column $k={-_s}$, Eq. (42)", [("column", -_s)]),
+        (f"$\\mathcal{{C}}_{{G\\to{_sp}}}$: row $n={-_sp}$, Eq. (44)", [("row", -_sp)]),
+        ("$\\mathcal{C}_{G\\to G}$: whole block, Eq. (45)", [("all", None)]),
     ]
     for _i, (_title, _read) in enumerate(_panels):
         kernel_block_plot(_fig.add_subplot(1, 4, _i + 1), _Psi, _el, _read if _el >= max(abs(_s), abs(_sp)) else (), _title)
@@ -1000,7 +1000,7 @@ def _():
 
     * wavelet coefficients $W^{\psi^{(j)}}={}_sf\circledast{}_s\psi^{(j)}=\mathcal{C}_{s\to G}[\Lambda_s\psi^{(j)}]\,{}_sf$ (Eq. 23);
     * scaling coefficients $W^{\Phi}={}_sf\odot{}_s\Phi=(2\pi)^{-1/2}\mathcal{C}_{s\to0}[\Lambda_s\Phi]\,{}_sf$, a *scalar* field (Eq. 25);
-    * the synthesis (Eq. 26), whose directional part is Haar synthesis $W\circledast^\dagger\psi=\mathcal{C}_{G\to s}[\widetilde{\Lambda_s\psi}]W$ with $(W\circledast^\dagger\psi)_{\ell m}=\sum_nW^{\ell}_{mn}\psi_{\ell n}$ (Eq. 32).  Haar synthesis is the adjoint of analysis (Proposition VI.2).
+    * the synthesis (Eq. 26), whose directional part is Haar synthesis $W\circledast^\dagger\psi=\mathcal{C}_{G\to s}[\widetilde{\Lambda_s\psi}]W$ with $(W\circledast^\dagger\psi)_{\ell m}=\sum_nW^{\ell}_{mn}\psi_{\ell n}$ (Eq. 31).  Haar synthesis is the adjoint of analysis (Proposition VI.2).
 
     The admissibility condition (Eq. 27) states that the analysis operators form a Parseval frame, so that synthesis inverts analysis exactly.  Below, a spin-2 field is analysed with a scaling function and four steerable directional wavelets.  These are built from telescoping Gaussian windows, $\kappa_\ell^2+\sum_j\zeta_{j\ell}^2=1$, with orders $n\in\{0,\pm2\}$.  The field is then reconstructed.
     """)
@@ -1069,7 +1069,7 @@ def _(L, p_spin2, seed):
         _syn = s2conv.lifted_convolution(_W, kernels.flipped(kernels.lifted(_psi, _s2)), "G", _s2)
         _ip_so3 = np.sum(((2 * np.arange(L_CHECK) + 1) / EIGHT_PI2)[None, :, None] * s2conv.lifted_convolution(_f, kernels.lifted(_psi, _s2), _s2, "G") * np.conj(_W))
         _eq32 = np.einsum("nlm,ln->lm", _W, _psi) * lm_mask(L_CHECK, _s2)
-        spin_rows.append(dict(paper="Prop. VI.2, Eq. (32)", check=f"$s={_s2}$: $\\mathcal{{C}}_{{G\\to{_s2}}}[\\widetilde{{\\Lambda_{{{_s2}}}\\psi}}]W$ and `classical.directional_synthesis` vs $\\sum_nW^{{\\ell}}_{{mn}}\\psi_{{\\ell n}}$",
+        spin_rows.append(dict(paper="Prop. VI.2, Eq. (31)", check=f"$s={_s2}$: $\\mathcal{{C}}_{{G\\to{_s2}}}[\\widetilde{{\\Lambda_{{{_s2}}}\\psi}}]W$ and `classical.directional_synthesis` vs $\\sum_nW^{{\\ell}}_{{mn}}\\psi_{{\\ell n}}$",
                               error=max(rel_err(_syn, _eq32), rel_err(classical.directional_synthesis(_W, _psi, _s2), _eq32))))
         spin_rows.append(dict(paper="Prop. VI.2", check=f"$s={_s2}$: synthesis is the adjoint, $\\langle f\\circledast\\psi,W\\rangle=\\langle f,W\\circledast^\\dagger\\psi\\rangle$",
                               error=abs(_ip_so3 - np.sum(_f * np.conj(_syn))) / abs(_ip_so3)))
@@ -1090,7 +1090,7 @@ def _():
 
     The group convolution $(\Psi\star F)(\rho)=\langle F,\pi_G(\rho)\Psi\rangle$ is $\mathcal{C}_{G\to G}[\Psi]$ (Proposition VI.7).  It is the $\mathrm{SO}(3)$ layer of Cohen *et al.*, the correlation of Kostelec & Rockmore and, with channel mixing, the generalised convolution of Cobb *et al.*
 
-    The four families are closed under composition, and composing multiplies kernel blocks, $\Psi_3^{\ell}=\Psi_2^{\ell}\Psi_1^{\ell}$ (Eq. 47).  Through an intermediate spin-$s'$ field only the index $-s'$ survives, so the multipliers of spin-changing convolutions simply multiply (Proposition V.3).  A chain of spin-changing layers therefore needs no intermediate transforms.
+    The four families are closed under composition, and composing multiplies kernel blocks, $\Psi_3^{\ell}=\Psi_2^{\ell}\Psi_1^{\ell}$ (Eq. 46).  Through an intermediate spin-$s'$ field only the index $-s'$ survives, so the multipliers of spin-changing convolutions simply multiply (Proposition V.3).  A chain of spin-changing layers therefore needs no intermediate transforms.
     """)
     return
 
@@ -1114,7 +1114,7 @@ def _(seed):
     _psi = generate_flm(_rng, _L, spin=1)
     group_rows = [
         dict(paper="Def. III.4, Eq. (20)", check="$\\mathcal{C}_{G\\to G}[\\Psi]F$ on the grid vs $\\langle F,\\pi_G(\\rho)\\Psi\\rangle$ by Parseval with left translation", error=max(_errs)),
-        dict(paper="Prop. V.3, Eq. (47)", check="$\\mathcal{C}_{G\\to G}[\\Psi_2]\\,\\mathcal{C}_{G\\to G}[\\Psi_1]=\\mathcal{C}_{G\\to G}[\\Psi_2\\Psi_1]$",
+        dict(paper="Prop. V.3, Eq. (46)", check="$\\mathcal{C}_{G\\to G}[\\Psi_2]\\,\\mathcal{C}_{G\\to G}[\\Psi_1]=\\mathcal{C}_{G\\to G}[\\Psi_2\\Psi_1]$",
              error=rel_err(s2conv.lifted_convolution(_out, _Psi2, "G", "G", N_out=_N), s2conv.lifted_convolution(_F, _Psi3, "G", "G", N_out=_N))),
         dict(paper="Prop. V.3", check="$\\mathcal{C}_{G\\to G}[\\Psi_2]\\,\\mathcal{C}_{1\\to G}[\\Lambda_1\\psi]=\\mathcal{C}_{1\\to G}[\\Psi_2\\,\\Lambda_1\\psi]$ (directional then group)",
              error=rel_err(s2conv.lifted_convolution(s2conv.lifted_convolution(_f, kernels.lifted(_psi, 1), 1, "G"), _Psi2, "G", "G"),
@@ -1133,7 +1133,7 @@ def _():
     mo.md(r"""
     ## 9. Spin-changing convolutions (Proposition VI.5, Theorem V.5, Corollary V.7)
 
-    Every bounded rotation-equivariant map from spin $s$ to spin $s'$ is a multiplier, ${}_{s'}f_{\ell m}=c_\ell\,{}_sf_{\ell m}$, and it is the lifted convolution $\mathcal{C}_{s\to s'}$ with the canonical kernel $(\Psi_T)^{\ell}_{-s',-s}=(-1)^{s+s'}c^*_\ell$ (Theorem V.5).  In real space its kernel is radial apart from the frame phases forced by the two spins (Corollary V.7, Eq. 56).  Writing $s(x)^{-1}s(y)=R_z(a)R_y(b)R_z(c)$,
+    Every bounded rotation-equivariant map from spin $s$ to spin $s'$ is a multiplier, ${}_{s'}f_{\ell m}=c_\ell\,{}_sf_{\ell m}$, and it is the lifted convolution $\mathcal{C}_{s\to s'}$ with the canonical kernel $(\Psi_T)^{\ell}_{-s',-s}=(-1)^{s+s'}c^*_\ell$ (Theorem V.5).  In real space its kernel is radial apart from the frame phases forced by the two spins (Corollary V.7, Eq. 55).  Writing $s(x)^{-1}s(y)=R_z(a)R_y(b)R_z(c)$,
 
     $$K(x,y)=e^{\mathrm{i}s'a}\,K(b)\,e^{\mathrm{i}sc},\qquad K(b)=\sum_\ell\frac{2\ell+1}{4\pi}\,c_\ell\,d^{\ell}_{s's}(b).$$
 
@@ -1359,7 +1359,7 @@ def _():
     mo.md(r"""
     ## 11. Beyond the framework: section evaluation and harmonic-diagonal operators (Sec. VII)
 
-    Anisotropic constructions that keep a directional kernel's output on the sphere are not lifted convolutions in general.  They are either **evaluations on a section** $\sigma(x)=s(x)R_z(\chi_\sigma(x))$ of the lifted convolution, which are sums of spin components in a chosen frame (Proposition VII.1, Eq. 63),
+    Anisotropic constructions that keep a directional kernel's output on the sphere are not lifted convolutions in general.  They are either **evaluations on a section** $\sigma(x)=s(x)R_z(\chi_\sigma(x))$ of the lifted convolution, which are sums of spin components in a chosen frame (Proposition VII.1, Eq. 62),
 
     $$E_\sigma[\Psi]\,{}_sf=\sum_{|s'|<N}\frac{e^{-\mathrm{i}s'\chi_\sigma}}{\sqrt{2\pi}}\,\mathcal{C}_{s\to s'}[\Psi]\,{}_sf,$$
 
@@ -1377,7 +1377,7 @@ def _():
 @app.function
 @functools.partial(jax.jit, static_argnames=("chi",))
 def section_at(components, theta, phi, chi=None):
-    """E_sigma[Psi] f = sum_{s'} e^{-i s' chi_sigma} (2 pi)^{-1/2} C_{s -> s'}[Psi] f (Eq. 63) at arbitrary points, from
+    """E_sigma[Psi] f = sum_{s'} e^{-i s' chi_sigma} (2 pi)^{-1/2} C_{s -> s'}[Psi] f (Eq. 62) at arbitrary points, from
     the spin components of s2conv.section.section_components, stacked over s' = -(N-1), ..., N-1; chi is the function
     chi_sigma(theta, phi), or None for the coordinate section.  JIT compiled, as the equivariance tests call it often."""
     N = azimuthal_bandlimit(components)
@@ -1429,7 +1429,7 @@ def _(L, N_DIR, dir_spins, f_bars, ridge_lm, seed):
     _thL, _phL = transforms.sphere_angles(L)
     _TL, _PL = np.meshgrid(_thL, _phL, indexing="ij")
     beyond_rows = [
-        dict(paper="Prop. VII.1, Def. III.7", check="standard correlation: section evaluation (Eq. 63), `section.standard_correlation`, vs directional convolution at $\\gamma=0$", error=rel_err(_std_L, _dirG)),
+        dict(paper="Prop. VII.1, Def. III.7", check="standard correlation: section evaluation (Eq. 62), `section.standard_correlation`, vs directional convolution at $\\gamma=0$", error=rel_err(_std_L, _dirG)),
         dict(paper="Sec. VII A (Wiaux et al.)", check="standard correlation: $\\sum_n\\sum_{\\ell m}(-1)^n\\sqrt{4\\pi/(2\\ell+1)}\\,\\psi^*_{\\ell,-n}f_{\\ell m}\\,{}_nY_{\\ell m}$", error=rel_err(_wiaux, _dirG)),
         dict(paper="App. B 8, Eqs. (B26), (B27)", check="standard correlation: $\\mathcal{O}(L^3)$ grid algorithm by factorisation of rotations, `section.standard_correlation_fourier`", error=rel_err(evaluate_fourier(_H, _TL, _PL), _dirG)),
     ]

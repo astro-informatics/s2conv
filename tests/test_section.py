@@ -123,7 +123,7 @@ def test_standard_correlation_commutes_with_grid_polar_rotations(rng):
 
 @pytest.mark.parametrize("spin", [0, 2, -1])
 def test_constant_twist_is_a_slice_of_the_directional_convolution(rng, spin):
-    """On the section s(x) R_z(chi), E_sigma[Lambda_s psi] f = (f (*) psi)(phi, theta, chi) (Eq. 63)."""
+    """On the section s(x) R_z(chi), E_sigma[Lambda_s psi] f = (f (*) psi)(phi, theta, chi) (Eq. 62)."""
     flm, psi = (
         generate_flm(rng, L, spin=spin),
         _low_orders(generate_flm(rng, L, spin=spin)),
@@ -155,7 +155,7 @@ def test_twist_as_function_array_or_constant(rng):
         )
         < ref.TOL
     )
-    # the evaluation is sum_{s'} e^{-is' chi} (2 pi)^{-1/2} C_{0->s'} f (Eq. 63)
+    # the evaluation is sum_{s'} e^{-is' chi} (2 pi)^{-1/2} C_{0->s'} f (Eq. 62)
     expected = sum(
         np.exp(-1j * sp * twist(T, P))
         * ref.isht(lifted.spin_to_spin(flm, kernel, 0, sp), L, sp)

@@ -132,7 +132,7 @@ def directional_synthesis(flmn, psi_lm, spin: int = 0) -> jnp.ndarray:
     Haar synthesis :math:`(W \circledast^\dagger \psi)(\omega) = \int W(\rho)\, (\mathcal{R}_\rho\psi)(\omega)\, \mathrm{d}\mu(\rho)`.
 
     Its harmonic form is :math:`\sum_n W^{\ell}_{mn}\, {}_s\psi_{\ell n}` (Definition III.10,
-    Eq. 32).  It is :math:`\mathcal{C}_{G\to s}[\widetilde{\Lambda_s\psi}]`, the adjoint of the
+    Eq. 31).  It is :math:`\mathcal{C}_{G\to s}[\widetilde{\Lambda_s\psi}]`, the adjoint of the
     directional convolution with the same kernel (Proposition VI.2).
 
     Args:

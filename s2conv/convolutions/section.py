@@ -4,7 +4,7 @@ Evaluation of lifted convolutions on a section of the bundle (Sec. VII A).
 Anisotropic constructions that keep the output of a directional kernel on the sphere
 evaluate a lifted convolution on a section :math:`\sigma(x) = s(x) R_z(\chi_\sigma(x))`.  For a
 kernel whose column :math:`k = -s` is supported on :math:`|n| < N`, this is a sum of spin
-components in the frame of the section (Proposition VII.1, Eq. 63):
+components in the frame of the section (Proposition VII.1, Eq. 62):
 
 .. math::
 

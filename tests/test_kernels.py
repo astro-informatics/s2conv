@@ -5,7 +5,7 @@ The constructors of Table II are checked by sampling each kernel as a function o
 rotation group and Wigner transforming it with s2fft (the spherical kernels have orders
 |m| < N, so that the sampling at azimuthal band-limit N is exact); the identity kernel
 reproduces the lift, the projection and the identity (Cor. V.6); composition multiplies
-kernel blocks (Prop. V.3); and the compact weights of Theorem V.5 (Eqs. 44, 54) are
+kernel blocks (Prop. V.3); and the compact weights of Theorem V.5 (Eqs. 43, 53) are
 checked against formulas written out from the kernel blocks.
 """
 
@@ -171,7 +171,7 @@ def test_compose_multiplies_blocks(rng):
 
 
 def test_composition_of_group_convolutions(rng):
-    """C_{G->G}[Psi_2] C_{G->G}[Psi_1] = C_{G->G}[Psi_2 Psi_1] (Proposition V.3, Eq. 47)."""
+    """C_{G->G}[Psi_2] C_{G->G}[Psi_1] = C_{G->G}[Psi_2 Psi_1] (Proposition V.3, Eq. 46)."""
     kernel1 = ref.block_to_kernel(ref.random_block(L, rng, N), N)
     kernel2 = ref.block_to_kernel(ref.random_block(L, rng, N), N)
     flmn = generate_flmn(rng, L, N)
@@ -232,7 +232,7 @@ def test_composition_through_a_spin_field_multiplies_multipliers(rng):
 
 @pytest.mark.parametrize(("s_in", "s_out"), [(2, 1), (0, 0), (-1, 3), (4, -4)])
 def test_to_multiplier(rng, s_in, s_out):
-    """c_l = (-1)^{s+s'} Psi^{l*}_{-s',-s}, zero below l = max(|s|, |s'|) (Eq. 44)."""
+    """c_l = (-1)^{s+s'} Psi^{l*}_{-s',-s}, zero below l = max(|s|, |s'|) (Eq. 43)."""
     block = ref.random_block(L, rng)
     c = kernels.to_multiplier(ref.block_to_kernel(block, N), s_in, s_out)
     expected = ref.parity(s_in + s_out) * np.conj(block[:, L - 1 - s_out, L - 1 - s_in])
@@ -248,7 +248,7 @@ def test_to_multiplier_of_a_kernel_without_the_column(rng):
 
 @pytest.mark.parametrize(("s_in", "n_out"), [(0, 3), (2, 5), (-3, L)])
 def test_to_column(rng, s_in, n_out):
-    """u^l_n = (-1)^s a_l^{-1/2} Psi^{l*}_{n,-s}, a_l = (2l+1)/(8 pi^2) (Eq. 54)."""
+    """u^l_n = (-1)^s a_l^{-1/2} Psi^{l*}_{n,-s}, a_l = (2l+1)/(8 pi^2) (Eq. 53)."""
     block = ref.random_block(L, rng)
     u = kernels.to_column(ref.block_to_kernel(block, L), s_in, n_out)
     a = (2 * np.arange(L) + 1) / ref.EIGHT_PI2
@@ -264,7 +264,7 @@ def test_to_column(rng, s_in, n_out):
 
 @pytest.mark.parametrize(("s_out", "n_in"), [(0, 3), (-2, 5), (3, 7)])
 def test_to_row(rng, s_out, n_in):
-    """v^l_k = (-1)^{s'} a_l^{1/2} Psi^{l*}_{-s',k} (Eq. 54), zero-padded beyond the kernel's band-limit."""
+    """v^l_k = (-1)^{s'} a_l^{1/2} Psi^{l*}_{-s',k} (Eq. 53), zero-padded beyond the kernel's band-limit."""
     n_kernel = 5
     block = ref.random_block(L, rng, n_kernel)
     v = kernels.to_row(ref.block_to_kernel(block, n_kernel), s_out, n_in)
@@ -281,7 +281,7 @@ def test_to_row(rng, s_out, n_in):
 
 @pytest.mark.parametrize(("n_in", "n_out"), [(3, 3), (2, 5), (6, 4)])
 def test_to_block(rng, n_in, n_out):
-    """B^l = Psi^{l dagger}, B[l, N_in - 1 + k, N_out - 1 + n] = Psi^{l*}_{nk} (Eq. 54)."""
+    """B^l = Psi^{l dagger}, B[l, N_in - 1 + k, N_out - 1 + n] = Psi^{l*}_{nk} (Eq. 53)."""
     block = ref.random_block(L, rng, 5)
     B = kernels.to_block(ref.block_to_kernel(block, 5), n_in, n_out)
     expected = np.conj(np.transpose(block, (0, 2, 1)))[

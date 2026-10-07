@@ -255,7 +255,7 @@ def euler_zyz(R):
 
 
 def section(theta, phi):
-    """The coordinate section s(theta, phi) = R(phi, theta, 0) (Eq. 33)."""
+    """The coordinate section s(theta, phi) = R(phi, theta, 0) (Eq. 32)."""
     return rot_matrix(phi, theta, 0.0)
 
 
@@ -442,7 +442,7 @@ def needlet_window(xi, B=2.0):
 
 
 def lift(flm, s, N):
-    """The lift in harmonic space (Lemma IV.7(c), Eq. 39): the single Wigner column n = -s."""
+    """The lift in harmonic space (Lemma IV.7(c), Eq. 38): the single Wigner column n = -s."""
     L = flm.shape[-2]
     out = np.zeros((2 * N - 1, L, 2 * L - 1), np.complex128)
     weight = parity(s) * np.sqrt(EIGHT_PI2 / (2 * np.arange(L) + 1))
@@ -451,7 +451,7 @@ def lift(flm, s, N):
 
 
 def project(flmn, s):
-    """The adjoint projection in harmonic space (Lemma IV.7(c), Eq. 39): it reads the column n = -s."""
+    """The adjoint projection in harmonic space (Lemma IV.7(c), Eq. 38): it reads the column n = -s."""
     N, L = n_of(flmn), flmn.shape[-2]
     if abs(s) >= N:
         return np.zeros((L, 2 * L - 1), np.complex128)
@@ -460,7 +460,7 @@ def project(flmn, s):
 
 
 def lift_grid(f, s, N):
-    """The lift on samples (Eq. 38): (2 pi)^{-1/2} e^{-is gamma} f(beta, alpha) on the SO(3) grid."""
+    """The lift on samples (Eq. 37): (2 pi)^{-1/2} e^{-is gamma} f(beta, alpha) on the SO(3) grid."""
     return (
         np.exp(-1j * s * gamma_grid(N))[:, None, None]
         * np.asarray(f)[None]
@@ -469,7 +469,7 @@ def lift_grid(f, s, N):
 
 
 def project_grid(F, s):
-    """The adjoint projection on samples (Eq. 38): the fibre integral against e^{is gamma}.
+    """The adjoint projection on samples (Eq. 37): the fibre integral against e^{is gamma}.
 
     The trapezoidal rule is exact for fibres band-limited at N > |s|.
     """
@@ -584,7 +584,7 @@ def block_multiplier(c, s, sp):
 
 
 def multiplier_of(block, s, sp):
-    """The multiplier c_l = (-1)^{s+s'} Psi^{l*}_{-s',-s} read by C_{s -> s'}[Psi] (Eq. 44)."""
+    """The multiplier c_l = (-1)^{s+s'} Psi^{l*}_{-s',-s} read by C_{s -> s'}[Psi] (Eq. 43)."""
     L = block.shape[0]
     c = parity(s + sp) * np.conj(block[:, L - 1 - sp, L - 1 - s])
     return np.where(np.arange(L) >= max(abs(s), abs(sp)), c, 0.0)

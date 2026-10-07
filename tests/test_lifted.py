@@ -4,7 +4,7 @@ The generalised lifted convolution (Sec. V) of :mod:`s2conv.convolutions.lifted`
 Each of the four operators of Definition V.1 is computed literally, on samples (the lift
 on the SO(3) grid, s2fft's Wigner transform, the block product of Eq. (20), the inverse
 transform and the fibre integral), and compared with the package, which applies the
-closed forms of Theorem V.2 (Eqs. 43-46).  The adjoints with the flipped kernel,
+closed forms of Theorem V.2 (Eqs. 42-45).  The adjoints with the flipped kernel,
 Corollary V.4, the weight forms of Theorem V.5 and the sampled wrappers are checked too.
 """
 
@@ -35,7 +35,7 @@ def _kernel(rng, n=N):
 
 @pytest.mark.parametrize(("s_in", "s_out"), SPIN_PAIRS)
 def test_spin_to_spin_is_the_literal_operator(rng, s_in, s_out):
-    """C_{s->s'}[Psi]: lift on the grid, Wigner transform, block product, fibre integral (Eq. 44)."""
+    """C_{s->s'}[Psi]: lift on the grid, Wigner transform, block product, fibre integral (Eq. 43)."""
     block, kernel = _kernel(rng)
     flm = generate_flm(rng, L, spin=s_in)
     literal = ref.sht(
@@ -46,7 +46,7 @@ def test_spin_to_spin_is_the_literal_operator(rng, s_in, s_out):
 
 @pytest.mark.parametrize("s_in", [0, 2, -3])
 def test_spin_to_group_is_the_literal_operator(rng, s_in):
-    """C_{s->G}[Psi] (Eq. 43)."""
+    """C_{s->G}[Psi] (Eq. 42)."""
     block, kernel = _kernel(rng)
     flm = generate_flm(rng, L, spin=s_in)
     literal = ref.wigner_fwd(
@@ -57,7 +57,7 @@ def test_spin_to_group_is_the_literal_operator(rng, s_in):
 
 @pytest.mark.parametrize("s_out", [0, 1, -4])
 def test_group_to_spin_is_the_literal_operator(rng, s_out):
-    """C_{G->s'}[Psi] (Eq. 45)."""
+    """C_{G->s'}[Psi] (Eq. 44)."""
     block, kernel = _kernel(rng)
     flmn = generate_flmn(rng, L, N)
     literal = ref.sht(
@@ -69,7 +69,7 @@ def test_group_to_spin_is_the_literal_operator(rng, s_out):
 
 
 def test_group_to_group_is_the_literal_operator(rng):
-    """C_{G->G}[Psi], the group convolution (Eqs. 20, 46)."""
+    """C_{G->G}[Psi], the group convolution (Eqs. 20, 45)."""
     block, kernel = _kernel(rng)
     flmn = generate_flmn(rng, L, N)
     literal = ref.wigner_fwd(
@@ -101,14 +101,14 @@ def _full_kernel(rng):
 
 
 def _assert_closed_form(actual, block, x, s_in, s_out):
-    """Against the composition Lambda^dagger (Psi * Lambda) of Definition V.1 and Eqs. (43)-(46)."""
+    """Against the composition Lambda^dagger (Psi * Lambda) of Definition V.1 and Eqs. (42)-(45)."""
     assert ref.rel_err(actual, ref.theorem_v2(block, x, s_in, s_out)) < ref.TOL
     assert ref.rel_err(actual, ref.lifted_conv(block, x, s_in, s_out)) < ref.TOL
 
 
 @pytest.mark.parametrize(("s_in", "s_out"), SPIN_PAIRS + [(7, -9), (-11, 0)])
 def test_spin_to_spin_closed_form_with_a_full_kernel(rng, s_in, s_out):
-    """Eq. (44) with every entry of the kernel populated, at any spins (no transform involved)."""
+    """Eq. (43) with every entry of the kernel populated, at any spins (no transform involved)."""
     block, kernel = _full_kernel(rng)
     flm = generate_flm(rng, L, spin=s_in)
     _assert_closed_form(
@@ -118,7 +118,7 @@ def test_spin_to_spin_closed_form_with_a_full_kernel(rng, s_in, s_out):
 
 @pytest.mark.parametrize("spin", [0, 3, -4, 9, -11])
 def test_spin_to_group_closed_form_with_a_full_kernel(rng, spin):
-    """Eq. (43)."""
+    """Eq. (42)."""
     block, kernel = _full_kernel(rng)
     flm = generate_flm(rng, L, spin=spin)
     _assert_closed_form(lifted.spin_to_group(flm, kernel, spin), block, flm, spin, "G")
@@ -126,7 +126,7 @@ def test_spin_to_group_closed_form_with_a_full_kernel(rng, spin):
 
 @pytest.mark.parametrize("spin", [0, 3, -4, 9, -11])
 def test_group_to_spin_closed_form_with_a_full_kernel(rng, spin):
-    """Eq. (45)."""
+    """Eq. (44)."""
     block, kernel = _full_kernel(rng)
     flmn = generate_flmn(rng, L, L)
     _assert_closed_form(
@@ -135,7 +135,7 @@ def test_group_to_spin_closed_form_with_a_full_kernel(rng, spin):
 
 
 def test_group_to_group_closed_form_with_a_full_kernel(rng):
-    """Eq. (46)."""
+    """Eq. (45)."""
     block, kernel = _full_kernel(rng)
     flmn = generate_flmn(rng, L, L)
     _assert_closed_form(lifted.group_to_group(flmn, kernel), block, flmn, "G", "G")

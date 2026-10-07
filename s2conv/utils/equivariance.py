@@ -287,7 +287,7 @@ def equivariance_errors_of_section(
 
     The evaluation on a section :math:`E_\sigma[\Psi]\,{}_sf = \sum_{|s'|<N}
     e^{-\mathrm{i}s'\chi_\sigma}(2\pi)^{-1/2}\mathcal{C}_{s\to s'}[\Psi]\,{}_sf` (Proposition VII.1,
-    Eq. 63) is a scalar field in the coordinate frame that is not band-limited.  Both
+    Eq. 62) is a scalar field in the coordinate frame that is not band-limited.  Both
     :math:`E_\sigma(\mathcal{R}f)` and :math:`\mathcal{R}(E_\sigma f)` are sums of band-limited spin
     components weighted by frame phases: the components of :math:`\mathcal{R}f`, and the rotated
     components of :math:`f`, since :math:`g(R^{-1}\omega) = e^{\mathrm{i}s'\vartheta}(\mathcal{R}g)(\omega)`

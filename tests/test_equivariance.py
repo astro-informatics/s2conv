@@ -190,7 +190,7 @@ def test_haar_synthesis_is_equivariant(rng):
 
 
 def _section_map(kernel, twist=None):
-    """f -> E_sigma[Psi] f at arbitrary points, from the package's spin components (Eq. 63)."""
+    """f -> E_sigma[Psi] f at arbitrary points, from the package's spin components (Eq. 62)."""
 
     def apply(f):
         components = np.asarray(section.section_components(f, kernel, 0, L))

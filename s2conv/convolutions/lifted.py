@@ -14,7 +14,7 @@ of Definition V.1 are
 with :math:`\star` the group convolution in correlation form,
 :math:`(\Psi \star F)(\rho) = \int \Psi^*(\rho^{-1}\rho') F(\rho')\, \mathrm{d}\mu(\rho')`
 (Definition III.4).  In harmonic space they read a single entry, column, row or the
-whole block of the kernel (Theorem V.2, Eqs. 43–46):
+whole block of the kernel (Theorem V.2, Eqs. 42–45):
 
 .. math::
 
@@ -120,7 +120,7 @@ def group_to_group_weights(flmn, B) -> jnp.ndarray:
 
 def spin_to_spin(flm, kernel, s_in: int, s_out: int) -> jnp.ndarray:
     r"""
-    :math:`\mathcal{C}_{s\to s'}[\Psi]`, which reads the single entry :math:`\Psi^{\ell}_{-s',-s}` (Eq. 44).
+    :math:`\mathcal{C}_{s\to s'}[\Psi]`, which reads the single entry :math:`\Psi^{\ell}_{-s',-s}` (Eq. 43).
 
     Args:
         flm: Spin-:math:`s` harmonic coefficients, ``[..., L, 2L - 1]``.
@@ -137,7 +137,7 @@ def spin_to_spin(flm, kernel, s_in: int, s_out: int) -> jnp.ndarray:
 
 def spin_to_group(flm, kernel, s_in: int, N_out: int = None) -> jnp.ndarray:
     r"""
-    :math:`\mathcal{C}_{s\to G}[\Psi]`, which reads the column :math:`k = -s` (Eq. 43).
+    :math:`\mathcal{C}_{s\to G}[\Psi]`, which reads the column :math:`k = -s` (Eq. 42).
 
     Args:
         flm: Spin-:math:`s` harmonic coefficients, ``[..., L, 2L - 1]``.
@@ -155,7 +155,7 @@ def spin_to_group(flm, kernel, s_in: int, N_out: int = None) -> jnp.ndarray:
 
 def group_to_spin(flmn, kernel, s_out: int) -> jnp.ndarray:
     r"""
-    :math:`\mathcal{C}_{G\to s'}[\Psi]`, which reads the row :math:`n = -s'` (Eq. 45).
+    :math:`\mathcal{C}_{G\to s'}[\Psi]`, which reads the row :math:`n = -s'` (Eq. 44).
 
     Args:
         flmn: Wigner coefficients, ``[..., 2N - 1, L, 2L - 1]``.
@@ -172,7 +172,7 @@ def group_to_spin(flmn, kernel, s_out: int) -> jnp.ndarray:
 
 def group_to_group(flmn, kernel, N_out: int = None) -> jnp.ndarray:
     r"""
-    :math:`\mathcal{C}_{G\to G}[\Psi] = \Psi \star\,\cdot\,`, the group convolution (Eqs. 20, 46).
+    :math:`\mathcal{C}_{G\to G}[\Psi] = \Psi \star\,\cdot\,`, the group convolution (Eqs. 20, 45).
 
     Args:
         flmn: Wigner coefficients, ``[..., 2N_in - 1, L, 2L - 1]``.

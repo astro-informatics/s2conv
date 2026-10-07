@@ -162,7 +162,7 @@ def test_directional_is_a_lifted_convolution(rng, spin):
 
 @pytest.mark.parametrize("spin", [0, 2])
 def test_directional_synthesis_harmonic_form(rng, spin):
-    """(W (*)^dagger psi)_{lm} = sum_n W^l_{mn} spsi_{ln} (Eq. 32)."""
+    """(W (*)^dagger psi)_{lm} = sum_n W^l_{mn} spsi_{ln} (Eq. 31)."""
     N = 5
     flmn, psi = generate_flmn(rng, L, N), generate_flm(rng, L, spin=spin)
     expected = sum(

@@ -124,7 +124,7 @@ def catalogue():
 
             def reduction(f):
                 if s_in == "G" and s_out == "G":
-                    # Eq. (46) written out, (Psi * F)^l_{mn} = sum_k F^l_{mk} Psi^{l*}_{nk}, since the
+                    # Eq. (45) written out, (Psi * F)^l_{mn} = sum_k F^l_{mk} Psi^{l*}_{nk}, since the
                     # composition of Definition V.1 is the group convolution itself here
                     block = jnp.conj(kernel[:, :, L - N_DIR : L + N_DIR - 1])
                     return [(op(x), jnp.einsum("klm,kln->nlm", x, block)) for x in f]

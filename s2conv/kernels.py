@@ -202,7 +202,7 @@ def steerable(multipliers: Mapping, s_in: int, N: int = None) -> jnp.ndarray:
 
 def to_multiplier(kernel, s_in: int, s_out: int) -> jnp.ndarray:
     r"""
-    The multiplier :math:`c_\ell = (-1)^{s+s'} \Psi^{\ell *}_{-s',-s}` of :math:`\mathcal{C}_{s\to s'}[\Psi]` (Eq. 44).
+    The multiplier :math:`c_\ell = (-1)^{s+s'} \Psi^{\ell *}_{-s',-s}` of :math:`\mathcal{C}_{s\to s'}[\Psi]` (Eq. 43).
 
     Args:
         kernel: The kernel, ``[..., 2N - 1, L, 2L - 1]``.
@@ -222,7 +222,7 @@ def to_multiplier(kernel, s_in: int, s_out: int) -> jnp.ndarray:
 
 def to_column(kernel, s_in: int, N_out: int) -> jnp.ndarray:
     r"""
-    The weights :math:`u^{\ell}_n = (-1)^s a_\ell^{-1/2} \Psi^{\ell *}_{n,-s}` of :math:`\mathcal{C}_{s\to G}[\Psi]` (Eq. 54).
+    The weights :math:`u^{\ell}_n = (-1)^s a_\ell^{-1/2} \Psi^{\ell *}_{n,-s}` of :math:`\mathcal{C}_{s\to G}[\Psi]` (Eq. 53).
 
     Args:
         kernel: The kernel, ``[..., 2N - 1, L, 2L - 1]``.
@@ -243,7 +243,7 @@ def to_column(kernel, s_in: int, N_out: int) -> jnp.ndarray:
 
 def to_row(kernel, s_out: int, N_in: int) -> jnp.ndarray:
     r"""
-    The weights :math:`v^{\ell}_k = (-1)^{s'} a_\ell^{1/2} \Psi^{\ell *}_{-s',k}` of :math:`\mathcal{C}_{G\to s'}[\Psi]` (Eq. 54).
+    The weights :math:`v^{\ell}_k = (-1)^{s'} a_\ell^{1/2} \Psi^{\ell *}_{-s',k}` of :math:`\mathcal{C}_{G\to s'}[\Psi]` (Eq. 53).
 
     Args:
         kernel: The kernel, ``[..., 2N - 1, L, 2L - 1]``.
@@ -261,7 +261,7 @@ def to_row(kernel, s_out: int, N_in: int) -> jnp.ndarray:
 
 def to_block(kernel, N_in: int, N_out: int) -> jnp.ndarray:
     r"""
-    The weights :math:`B^{\ell} = \Psi^{\ell\dagger}` of :math:`\mathcal{C}_{G\to G}[\Psi]` (Eq. 54).
+    The weights :math:`B^{\ell} = \Psi^{\ell\dagger}` of :math:`\mathcal{C}_{G\to G}[\Psi]` (Eq. 53).
 
     Args:
         kernel: The kernel, ``[..., 2N - 1, L, 2L - 1]``.

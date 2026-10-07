@@ -2,7 +2,7 @@
 Spin-changing convolutions (Proposition VI.5, Theorem V.5, Corollaries V.7 and Prop. VI.6).
 
 A spin s -> s' multiplier applied with its canonical kernel is compared with exact
-quadrature of the radial two-point kernel with its frame phases (Eq. 56 / A10), in the
+quadrature of the radial two-point kernel with its frame phases (Eq. 55 / A10), in the
 canonical angles and in the literal angles of Tessore et al.; the realisations of the
 spin-weighted convolutions of Esteves et al. (Eqs. 13, 15) and of the spin needlets are
 checked, and steerability: the directional output is the sum of lifted spin components.

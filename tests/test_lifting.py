@@ -1,8 +1,8 @@
 """
 The lift of spin fields to the rotation group and its adjoint projection (Sec. IV).
 
-The harmonic forms of Lemma IV.7(c) (Eq. 39) are checked against the literal operators
-on samples (Eq. 38) followed by s2fft's transforms; the projection inverts the lift, is
+The harmonic forms of Lemma IV.7(c) (Eq. 38) are checked against the literal operators
+on samples (Eq. 37) followed by s2fft's transforms; the projection inverts the lift, is
 its adjoint, and the fibre decomposition of Corollary IV.12 reassembles any function on
 the rotation group from its spin components.
 """
@@ -21,7 +21,7 @@ N = 4
 @pytest.mark.parametrize("spin", [0, 2, -3])
 def test_lift_is_the_sampled_lift(rng, spin):
     """(Lambda_s f)(alpha, beta, gamma) = (2 pi)^{-1/2} e^{-is gamma} f(beta, alpha) on the SO(3) grid,
-    Wigner transformed, is the single column n = -s of Eq. (39)."""
+    Wigner transformed, is the single column n = -s of Eq. (38)."""
     flm = generate_flm(rng, L, spin=spin)
     sampled = ref.lift_grid(ref.isht(flm, L, spin), spin, N)
     assert (
@@ -32,7 +32,7 @@ def test_lift_is_the_sampled_lift(rng, spin):
 @pytest.mark.parametrize("spin", [0, 2, -3])
 def test_project_is_the_fibre_integral(rng, spin):
     """(Lambda_s^dagger F)(beta, alpha) = (2 pi)^{-1/2} int e^{is gamma} F d gamma, spin transformed,
-    reads the column n = -s of Eq. (39)."""
+    reads the column n = -s of Eq. (38)."""
     flmn = generate_flmn(rng, L, N)
     projected = ref.project_grid(ref.wigner_inv(flmn, L, N), spin)
     assert (

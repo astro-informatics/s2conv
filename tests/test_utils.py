@@ -181,7 +181,7 @@ def test_euler_angles_round_trip(rng):
 
 
 def test_section_is_the_coordinate_frame(rng):
-    """s(theta, phi) = R(phi, theta, 0) carries the north pole to the point (theta, phi) (Eq. 33)."""
+    """s(theta, phi) = R(phi, theta, 0) carries the north pole to the point (theta, phi) (Eq. 32)."""
     theta, phi = ref.random_points(rng, 6)
     S = np.asarray(utils.section(theta, phi))
     assert ref.rel_err(S, ref.rot_matrix(phi, theta, 0.0)) < ref.TOL

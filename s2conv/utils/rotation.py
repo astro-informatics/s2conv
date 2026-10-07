@@ -168,7 +168,7 @@ def euler_angles(R) -> tuple:
 
 def section(theta, phi) -> jnp.ndarray:
     r"""
-    The coordinate section :math:`s(\theta, \varphi) = R(\varphi, \theta, 0)` (Eq. 33).
+    The coordinate section :math:`s(\theta, \varphi) = R(\varphi, \theta, 0)` (Eq. 32).
 
     Args:
         theta: Colatitudes.

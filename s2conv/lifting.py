@@ -12,7 +12,7 @@ For spin :math:`s` the isometric lift :math:`\Lambda_s` and its adjoint, the pro
     e^{\mathrm{i}s\gamma} F(\alpha, \beta, \gamma)\, \mathrm{d}\gamma .
 
 In harmonic space the lift fills the single Wigner column :math:`n = -s` and the
-projection reads it (Lemma IV.7(c), Eq. 39):
+projection reads it (Lemma IV.7(c), Eq. 38):
 
 .. math::
 
@@ -136,7 +136,7 @@ def gamma_samples(N: int) -> np.ndarray:
 
 def lift_samples(f, spin: int, N: int = None) -> jnp.ndarray:
     r"""
-    The lift :math:`\Lambda_s` on samples (Eq. 38).
+    The lift :math:`\Lambda_s` on samples (Eq. 37).
 
     Args:
         f: Samples of a spin-:math:`s` field on the sphere, of any sampling scheme.
@@ -155,7 +155,7 @@ def lift_samples(f, spin: int, N: int = None) -> jnp.ndarray:
 
 def project_samples(F, spin: int) -> jnp.ndarray:
     r"""
-    The adjoint projection :math:`\Lambda_s^\dagger` on samples (Eq. 38).
+    The adjoint projection :math:`\Lambda_s^\dagger` on samples (Eq. 37).
 
     The integral over the fibre is evaluated by the trapezoidal rule, which is exact for
     samples azimuthally band-limited at :math:`N > |s|`.
