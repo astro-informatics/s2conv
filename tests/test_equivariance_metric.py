@@ -222,6 +222,11 @@ def test_parseval_weights_are_the_l2_norm_on_the_rotation_group(rng):
     assert abs(parseval - quadrature) < 1e-12 * parseval
 
 
+def test_parseval_weights_reject_other_shapes():
+    with pytest.raises(ValueError, match="harmonic coefficients"):
+        eq._parseval_weights((L * L,))
+
+
 def test_quadrature_is_exact_for_band_limited_fields(rng):
     theta, phi, weights = eq.quadrature(L)
     for spin in (0, 2, -3):
