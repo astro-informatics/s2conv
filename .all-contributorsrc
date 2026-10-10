@@ -1,0 +1,31 @@
+{
+  "files": [
+    "README.md"
+  ],
+  "imageSize": 100,
+  "commit": false,
+  "commitConvention": "angular",
+  "contributors": [
+    {
+      "login": "jasonmcewen",
+      "name": "Jason McEwen",
+      "avatar_url": "https://avatars.githubusercontent.com/u/3181701?v=4",
+      "profile": "http://www.jasonmcewen.org",
+      "contributions": [
+        "code",
+        "ideas",
+        "research",
+        "doc",
+        "maintenance",
+        "review"
+      ]
+    }
+  ],
+  "contributorsPerLine": 7,
+  "skipCi": true,
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "projectName": "s2conv",
+  "projectOwner": "astro-informatics",
+  "commitType": "docs"
+}

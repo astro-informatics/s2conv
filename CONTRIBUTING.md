@@ -93,3 +93,17 @@ The main steps are as follows:
 5. Make sure that all the automated checks (tests, linting and documentation build) pass on the pull request.
 6. Await a review by one of the maintainers and address any comments.
 7. Once the checks pass and a maintainer has approved the changes, the pull request can be (squash) merged.
+
+## Recognising contributions
+
+We recognise every kind of contribution, not just code, following the [all-contributors](https://allcontributors.org) specification: the contributors are listed in the [Contributors section of the README](https://github.com/astro-informatics/s2conv#contributors-), with an emoji for each [type of contribution](https://allcontributors.org/docs/en/emoji-key), for example code, documentation, tests, bug reports, ideas, research or review.
+
+To add someone, a maintainer comments on an issue or pull request with
+
+```text
+@all-contributors please add @<username> for <contributions>
+```
+
+for example `@all-contributors please add @jasonmcewen for code, doc`.
+The [all-contributors bot](https://allcontributors.org/docs/en/bot/overview) then opens a pull request that updates `.all-contributorsrc` and the table in `README.md`.
+If you think you or someone else should be listed, please say so in an issue or pull request.
