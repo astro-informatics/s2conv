@@ -6,6 +6,7 @@
 [![Linting status](https://github.com/astro-informatics/s2conv/actions/workflows/linting.yml/badge.svg?branch=main)](https://github.com/astro-informatics/s2conv/actions/workflows/linting.yml)
 [![Documentation status](https://github.com/astro-informatics/s2conv/actions/workflows/docs.yml/badge.svg?branch=main)](https://astro-informatics.github.io/s2conv/)
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![All Contributors](https://img.shields.io/github/all-contributors/astro-informatics/s2conv?color=ee8449&style=flat-square)](#contributors-)
 [![Linter](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 </div>
@@ -152,6 +153,28 @@ pytest
 ```
 
 The tests marked `slow` run every operator of the equivariance benchmark at 20 signals × 20 rotations; `pytest -m "not slow"` skips them.
+
+## Contributors ✨
+
+Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="http://www.jasonmcewen.org"><img src="https://avatars.githubusercontent.com/u/3181701?v=4?s=100" width="100px;" alt="Jason McEwen"/><br /><sub><b>Jason McEwen</b></sub></a><br /><a href="https://github.com/astro-informatics/s2conv/commits?author=jasonmcewen" title="Code">💻</a> <a href="#ideas-jasonmcewen" title="Ideas, Planning, & Feedback">🤔</a> <a href="#research-jasonmcewen" title="Research">🔬</a> <a href="https://github.com/astro-informatics/s2conv/commits?author=jasonmcewen" title="Documentation">📖</a> <a href="#maintenance-jasonmcewen" title="Maintenance">🚧</a> <a href="https://github.com/astro-informatics/s2conv/pulls?q=is%3Apr+reviewed-by%3Ajasonmcewen" title="Reviewed Pull Requests">👀</a></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
+This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification, and we welcome contributions of any kind; see [CONTRIBUTING.md](https://github.com/astro-informatics/s2conv/blob/main/CONTRIBUTING.md).
 
 ## Attribution 📚
 
