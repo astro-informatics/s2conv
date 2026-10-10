@@ -1,5 +1,10 @@
 <div style="text-align: center;" align="center">
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/astro-informatics/s2conv/main/docs/assets/s2conv_logo_dark.png">
+  <img width="98" alt="s2conv logo - a hexagon-tiled sphere with the fibre of frames over one point, its rim coloured by phase" src="https://raw.githubusercontent.com/astro-informatics/s2conv/main/docs/assets/s2conv_logo.png">
+</picture>
+
 # S2CONV: differentiable and accelerated spherical convolutions
 
 [![Tests status](https://github.com/astro-informatics/s2conv/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/astro-informatics/s2conv/actions/workflows/tests.yml)

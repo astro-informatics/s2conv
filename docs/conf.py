@@ -53,6 +53,13 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 html_theme = "pydata_sphinx_theme"
 html_theme_options = {
+    # paths relative to this directory; the theme copies the images into _static
+    "logo": {
+        "image_light": "assets/s2conv_logo.svg",
+        "image_dark": "assets/s2conv_logo_dark.svg",
+        "text": "S2CONV",
+        "alt_text": "S2CONV logo - home",
+    },
     "navbar_align": "left",
     "show_toc_level": 2,
     "icon_links": [
