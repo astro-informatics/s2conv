@@ -12,7 +12,7 @@
 [![Documentation status](https://github.com/astro-informatics/s2conv/actions/workflows/docs.yml/badge.svg?branch=main)](https://astro-informatics.github.io/s2conv/)
 [![Codecov](https://codecov.io/gh/astro-informatics/s2conv/branch/main/graph/badge.svg)](https://codecov.io/gh/astro-informatics/s2conv)
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![All Contributors](https://img.shields.io/github/all-contributors/astro-informatics/s2conv?color=ee8449&style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/github/all-contributors/astro-informatics/s2conv?color=ee8449&style=flat-square)](https://github.com/astro-informatics/s2conv#contributors-)
 [![Linter](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 </div>
@@ -23,18 +23,18 @@
 
 A spin-$s$ field on the sphere is lifted to the rotation group $\mathrm{SO}(3)$ through the irreducible representation of spin $s$ of the stabiliser, convolved on $\mathrm{SO}(3)$ with a kernel $\Psi$, and projected back to the sphere through the adjoint of the lift for a possibly different spin $s'$:
 
-$$
+```math
 \mathcal{C}_{s\to s'}[\Psi] = \Lambda_{s'}^{\dagger}\,(\Psi\star\Lambda_s\,\cdot\,),\qquad
 \mathcal{C}_{s\to G}[\Psi] = \Psi\star\Lambda_s\,\cdot\,,\qquad
 \mathcal{C}_{G\to s'}[\Psi] = \Lambda_{s'}^{\dagger}\,(\Psi\star\cdot\,),\qquad
 \mathcal{C}_{G\to G}[\Psi] = \Psi\star\cdot\,.
-$$
+```
 
 In harmonic space each operator reads a single entry, column, row or the whole block of the Wigner coefficients of the kernel.  For example, a spin $s \to s'$ convolution multiplies each harmonic coefficient by a single Wigner coefficient of the kernel,
 
-$$
+```math
 \left(\mathcal{C}_{s\to s'}[\Psi]\,{}_sf\right)_{\ell m} = (-1)^{s+s'}\,{}_sf_{\ell m}\,\Psi^{\ell *}_{-s',-s},
-$$
+```
 
 and every bounded rotation-equivariant map between spin fields is of this form.  The convolutions of the literature differ only in their kernels.
 
@@ -62,17 +62,17 @@ The non-equivariant constructions that keep the output of a directional kernel o
 | `"jax_ssht"` | JAX frontend to SSHT, CPU only | any | $\mathcal{O}(L^2)$ |
 | `"numpy"` | NumPy reference | $\lvert s\rvert, N < 8$ | $\mathcal{O}(L^2)$ |
 
-All backends except `"numpy"` are differentiable in reverse mode (`jax.grad`, `jax.vjp`); `"jax"` and `"precompute"` can be JIT compiled and run on GPUs.  Forward mode (`jax.jvp`, `jax.jacfwd`) works through `"precompute"`, and through `"jax"` with `S2FFT` newer than 1.4.0, but not through `"jax_ssht"`.  The harmonic operators themselves support both modes.
+All backends except `"numpy"` are differentiable in reverse mode (`jax.grad`, `jax.vjp`); `"jax"` and `"precompute"` can be JIT compiled and run on GPUs.  Forward mode (`jax.jvp`, `jax.jacfwd`) works through `"precompute"`, and through `"jax"` with `S2FFT` 1.5.0 or later, but not through `"jax_ssht"`.  The harmonic operators themselves support both modes.
 
 ## Installation 💻
 
-`S2CONV` requires Python 3.11 or later, and is tested on Python 3.11 and 3.12.  Python 3.13 awaits the next release of `S2FFT`: version 1.4.0 fails to import on it, because its compiled extension is built for Python 3.12 only.  From a clone of this repository,
+`S2CONV` requires Python 3.11 or later, and is tested on Python 3.11, 3.12 and 3.13 (on 3.13 it needs `S2FFT` 1.5.0 or later).  Install it from PyPI with
 
 ```bash
-pip install .
+pip install s2conv
 ```
 
-installs it with its dependencies, [`JAX`](https://github.com/jax-ml/jax) and `S2FFT`.  The optional extras are `tests` (the test suite), `notebooks` (the Marimo notebook), `docs` (the documentation) and `ssht` (the `"jax_ssht"` backend).  For GPU support install a CUDA build of JAX, following the [JAX installation guide](https://docs.jax.dev/en/latest/installation.html).
+which also installs its dependencies, [`JAX`](https://github.com/jax-ml/jax) and `S2FFT`.  To install the development version instead, run `pip install .` from a clone of this repository.  The optional extras are `tests` (the test suite), `notebooks` (the Marimo notebooks), `docs` (the documentation) and `ssht` (the `"jax_ssht"` backend).  For GPU support install a CUDA build of JAX, following the [JAX installation guide](https://docs.jax.dev/en/latest/installation.html).
 
 ## Usage 🚀
 
@@ -191,14 +191,14 @@ This project follows the [all-contributors](https://github.com/all-contributors/
 
 ## Attribution 📚
 
-`S2CONV` implements the construction of the article *Unifying spherical convolutions through lifting* (J. D. McEwen, in preparation); please cite it, and `S2FFT`, if you use this code:
+`S2CONV` implements the construction of the article *Unifying spherical convolutions through lifting* (J. D. McEwen, 2026, forthcoming); please cite it, and `S2FFT`, if you use this code:
 
 ```
 @unpublished{mcewen2026unifying,
    author      = "Jason D. McEwen",
    title       = "Unifying spherical convolutions through lifting",
    year        = "2026",
-   note        = "In preparation"
+   note        = "Forthcoming"
 }
 
 @article{price:s2fft,

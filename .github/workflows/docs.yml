@@ -28,7 +28,6 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      # Not 3.13, on which s2fft 1.4.0 fails to import (see tests.yml)
       - name: Set up Python
         uses: actions/setup-python@v6
         with:

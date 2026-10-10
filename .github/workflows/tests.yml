@@ -29,11 +29,15 @@ jobs:
       id-token: write
     strategy:
       matrix:
-        # Python 3.13 awaits an s2fft release newer than 1.4.0: the compiled extension
-        # in its abi3 wheels is built for CPython 3.12 only, so s2fft 1.4.0 fails to
-        # import on 3.13 (fixed on s2fft's main branch by #362)
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
         os: [ubuntu-latest, macos-latest]
+        s2fft: [latest]
+        # The oldest supported s2fft too, which pip would otherwise never install
+        # (on Python 3.13 it fails to import, so s2conv requires s2fft>=1.5.0 there)
+        include:
+          - python-version: "3.11"
+            os: ubuntu-latest
+            s2fft: "1.4.0"
       fail-fast: false
 
     steps:
@@ -57,6 +61,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install ".[tests,ssht]"
+          if [ "${{ matrix.s2fft }}" != latest ]; then python -m pip install "s2fft==${{ matrix.s2fft }}"; fi
 
       # Run as a module so that the working tree, rather than the installed copy of
       # the package, is imported, and hence measured for coverage

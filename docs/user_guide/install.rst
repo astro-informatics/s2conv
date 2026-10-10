@@ -2,16 +2,25 @@ Installation
 ============
 
 s2conv is a pure-Python package that requires Python 3.11 or later, and is tested on
-Python 3.11 and 3.12.  Its dependencies, NumPy, JAX and
-`s2fft <https://github.com/astro-informatics/s2fft>`_, are installed automatically.
-Python 3.13 awaits the next release of s2fft: version 1.4.0 fails to import on it,
-because its compiled extension is built for Python 3.12 only.
+Python 3.11, 3.12 and 3.13.  Its dependencies, NumPy, JAX and
+`s2fft <https://github.com/astro-informatics/s2fft>`_, are installed automatically
+(on Python 3.13, s2fft 1.5.0 or later).
+
+Installing from PyPI
+--------------------
+
+Install the latest release of s2conv from `PyPI <https://pypi.org/project/s2conv/>`_
+with pip:
+
+.. code-block:: bash
+
+   pip install s2conv
 
 Installing from source
 ----------------------
 
-s2conv is currently installed from source.
-Clone the repository and install the package with pip:
+To install the development version, clone the repository and install the package
+with pip:
 
 .. code-block:: bash
 

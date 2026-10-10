@@ -95,7 +95,7 @@ The modules of the package are described in the :doc:`API documentation <api/ind
 Citation
 --------
 
-The article is in preparation.
+The article is forthcoming.
 Please see the file ``CITATION.cff`` in the repository for how to cite s2conv.
 
 .. toctree::
