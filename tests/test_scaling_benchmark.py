@@ -66,6 +66,8 @@ def test_scaling_command_line(tmp_path):
             str(json_path),
             "--plot",
             str(plot_path),
+            "--plot-from",
+            "6",
         ]
     )
     record = json.loads(json_path.read_text())
