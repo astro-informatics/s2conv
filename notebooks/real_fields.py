@@ -1,7 +1,22 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "jax",
+#     "marimo",
+#     "matplotlib",
+#     "numpy",
+#     "s2conv @ git+https://github.com/astro-informatics/s2conv",  # "s2conv" once it is released on PyPI
+#     "s2fft>=1.5.0",  # the first release whose compiled extension imports on Python 3.13
+# ]
+# ///
 # Lifted convolutions of real spin fields: a companion to the notebook lifted_convolutions.py, built on s2conv.
 # Install s2conv with the notebook extras from the repository root, pip install -e ".[notebooks]", then run
 #     marimo edit notebooks/real_fields.py   (or: marimo run notebooks/real_fields.py)
-# The fields are read from notebooks/data, which make_example_fields.py builds from the public data.
+# or let marimo install the dependencies listed above in an isolated environment, with uv:
+#     marimo edit --sandbox notebooks/real_fields.py
+# molab reads the same list: https://molab.marimo.io/github/astro-informatics/s2conv/blob/main/notebooks/real_fields.py
+# The fields are read from notebooks/data, which make_example_fields.py builds from the public data, or are downloaded
+# from GitHub when the notebook runs without the repository, as in molab.
 
 import marimo
 
@@ -12,11 +27,27 @@ with app.setup:
     # Imports and constants shared by every cell and function below.
     import functools
     import io
+    import logging
     import os
+    import re
+    import shutil
+    import subprocess
     import urllib.request
+    from importlib import metadata
     from pathlib import Path
 
     os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")  # allocate GPU memory as needed
+    # run on the CPU unless there is an NVIDIA GPU and JAX's CUDA plugin is built for the installed jaxlib; a CUDA plugin
+    # of another version, such as the one preinstalled in molab, logs a traceback as JAX starts, which JAX then ignores
+    # and which is hidden here
+    _cuda_plugins = {_d.version for _d in metadata.distributions()
+                     if re.fullmatch(r"jax[-_]cuda\d+[-_]plugin", (_d.metadata["Name"] or "").lower())}
+    if (_cuda_plugins != {metadata.version("jaxlib")} or shutil.which("nvidia-smi") is None
+            or subprocess.run(["nvidia-smi", "-L"], capture_output=True).returncode != 0):
+        os.environ.setdefault("JAX_PLATFORMS", "cpu")
+    if _cuda_plugins - {metadata.version("jaxlib")}:
+        logging.getLogger("jax._src.xla_bridge").addFilter(
+            lambda record: not record.getMessage().startswith("Jax plugin configuration error"))
 
     import jax
 

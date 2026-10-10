@@ -56,7 +56,7 @@ Further dependencies are available as extras, which can be combined:
      - building this documentation
    * - ``notebooks``
      - marimo and matplotlib
-     - running the notebook in the ``notebooks`` directory
+     - running the :doc:`notebooks <notebooks>` in the ``notebooks`` directory
    * - ``ssht``
      - pyssht and ducc0
      - the ``"jax_ssht"`` backend of the transforms
