@@ -6,11 +6,21 @@ Python 3.11, 3.12 and 3.13.  Its dependencies, NumPy, JAX and
 `s2fft <https://github.com/astro-informatics/s2fft>`_, are installed automatically
 (on Python 3.13, s2fft 1.5.0 or later).
 
+Installing from PyPI
+--------------------
+
+Install the latest release of s2conv from `PyPI <https://pypi.org/project/s2conv/>`_
+with pip:
+
+.. code-block:: bash
+
+   pip install s2conv
+
 Installing from source
 ----------------------
 
-s2conv is currently installed from source.
-Clone the repository and install the package with pip:
+To install the development version, clone the repository and install the package
+with pip:
 
 .. code-block:: bash
 
