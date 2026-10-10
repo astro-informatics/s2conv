@@ -97,8 +97,10 @@ markers = [
 [tool.ruff]
 fix = true
 force-exclude = true
-# The Marimo notebooks have their own format: exclude them from linting and formatting.
+# The Marimo notebooks have their own format: exclude them from linting and formatting.  The
+# logo's generator is kept as its designer wrote it, so that it reproduces the SVGs byte for byte.
 extend-exclude = [
+    "docs/assets",
     "notebooks",
     "s2conv/_version.py",
 ]
