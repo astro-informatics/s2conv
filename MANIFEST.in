@@ -1,0 +1,4 @@
+# The sdist takes every file tracked by git (setuptools-scm); leave out the
+# figures exported from the notebooks, which are rebuilt by
+# notebooks/export_real_fields_figures.py
+prune notebooks/figures

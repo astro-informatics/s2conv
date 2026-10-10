@@ -18,8 +18,8 @@ The backends are:
 
 All transforms are exact, up to floating-point error, for band-limited signals.  All
 backends except ``"numpy"`` support reverse-mode differentiation.  Forward mode
-(``jax.jvp``) is supported by ``"precompute"``, and by ``"jax"`` with s2fft newer than
-1.4.0 (the JAX transforms of s2fft 1.4.0 define only a custom VJP); ``"jax_ssht"``
+(``jax.jvp``) is supported by ``"precompute"``, and by ``"jax"`` with s2fft 1.5.0 or
+later (the JAX transforms of s2fft 1.4.0 define only a custom VJP); ``"jax_ssht"``
 supports reverse mode only.
 """
 

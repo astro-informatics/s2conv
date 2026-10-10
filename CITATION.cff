@@ -18,9 +18,9 @@ references:
         orcid: 'https://orcid.org/0000-0002-5852-8890'
     title: Unifying spherical convolutions through lifting
     year: 2026
-    status: in-preparation
+    status: in-press
     notes: >-
-      Article in preparation, describing the generalised lifted spherical
+      Forthcoming article describing the generalised lifted spherical
       convolution implemented in s2conv.
   - type: article
     authors:
