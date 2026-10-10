@@ -136,7 +136,7 @@ Two Marimo notebooks run in the browser on [molab](https://molab.marimo.io), whi
 To run them locally, install the package with the notebook extras,
 
 ```bash
-pip install ".[notebooks]"
+pip install "s2conv[notebooks]"
 marimo edit notebooks/lifted_convolutions.py
 ```
 
