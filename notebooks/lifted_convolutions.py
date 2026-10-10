@@ -25,16 +25,26 @@ app = marimo.App(width="medium", app_title="Lifted spherical convolutions")
 with app.setup:
     # Imports and numerical configuration shared by every cell and function below.
     import functools
+    import logging
     import os
+    import re
     import shutil
     import subprocess
     import time
+    from importlib import metadata
 
     os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")  # allocate GPU memory as needed
-    # without an NVIDIA GPU, run on the CPU from the start: a CUDA plugin installed without a GPU, as in molab when no GPU
-    # is attached, would otherwise print a traceback when JAX looks for one, before falling back to the CPU anyway
-    if shutil.which("nvidia-smi") is None or subprocess.run(["nvidia-smi", "-L"], capture_output=True).returncode != 0:
+    # run on the CPU unless there is an NVIDIA GPU and JAX's CUDA plugin is built for the installed jaxlib; a CUDA plugin
+    # of another version, such as the one preinstalled in molab, logs a traceback as JAX starts, which JAX then ignores
+    # and which is hidden here
+    _cuda_plugins = {_d.version for _d in metadata.distributions()
+                     if re.fullmatch(r"jax[-_]cuda\d+[-_]plugin", (_d.metadata["Name"] or "").lower())}
+    if (_cuda_plugins != {metadata.version("jaxlib")} or shutil.which("nvidia-smi") is None
+            or subprocess.run(["nvidia-smi", "-L"], capture_output=True).returncode != 0):
         os.environ.setdefault("JAX_PLATFORMS", "cpu")
+    if _cuda_plugins - {metadata.version("jaxlib")}:
+        logging.getLogger("jax._src.xla_bridge").addFilter(
+            lambda record: not record.getMessage().startswith("Jax plugin configuration error"))
 
     import jax
 
