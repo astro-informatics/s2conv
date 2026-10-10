@@ -5,12 +5,12 @@
 #     "marimo",
 #     "matplotlib",
 #     "numpy",
-#     "s2conv @ git+https://github.com/astro-informatics/s2conv",  # "s2conv" once it is released on PyPI
+#     "s2conv>=0.1.0",
 #     "s2fft>=1.5.0",  # the first release whose compiled extension imports on Python 3.13
 # ]
 # ///
 # Numerical companion to "Unifying spherical convolutions through lifting" (J. D. McEwen), built on the s2conv package.
-# Install s2conv with the notebook extras from the repository root, pip install -e ".[notebooks]", then run
+# Install s2conv with the notebook extras, pip install "s2conv[notebooks]", then run
 #     marimo edit notebooks/lifted_convolutions.py   (or: marimo run notebooks/lifted_convolutions.py)
 # or let marimo install the dependencies listed above in an isolated environment, with uv:
 #     marimo edit --sandbox notebooks/lifted_convolutions.py

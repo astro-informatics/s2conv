@@ -39,7 +39,7 @@ open it with marimo, from the repository root:
 
 .. code-block:: bash
 
-   pip install ".[notebooks]"
+   pip install "s2conv[notebooks]"
    marimo edit notebooks/lifted_convolutions.py
 
 Alternatively, marimo can install the dependencies listed in the notebook into an isolated
