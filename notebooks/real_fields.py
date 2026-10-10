@@ -28,10 +28,16 @@ with app.setup:
     import functools
     import io
     import os
+    import shutil
+    import subprocess
     import urllib.request
     from pathlib import Path
 
     os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")  # allocate GPU memory as needed
+    # without an NVIDIA GPU, run on the CPU from the start: a CUDA plugin installed without a GPU, as in molab when no GPU
+    # is attached, would otherwise print a traceback when JAX looks for one, before falling back to the CPU anyway
+    if shutil.which("nvidia-smi") is None or subprocess.run(["nvidia-smi", "-L"], capture_output=True).returncode != 0:
+        os.environ.setdefault("JAX_PLATFORMS", "cpu")
 
     import jax
 
