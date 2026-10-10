@@ -126,14 +126,21 @@ grad = jax.grad(loss)(jnp.asarray(c))
 
 Harmonic-space operators (`s2conv.lifted`, `s2conv.classical`, `s2conv.physics`, `s2conv.diagonal`) act on coefficients in the `S2FFT` layout and broadcast over leading axes, so that batches, channels or spins can be carried as leading dimensions or mapped with `jax.vmap`.
 
-## Notebook 📓
+## Notebooks 📓
 
-The Marimo notebook [`notebooks/lifted_convolutions.py`](https://github.com/astro-informatics/s2conv/blob/main/notebooks/lifted_convolutions.py) demonstrates each convolution with `S2CONV` and checks it numerically against the closed forms of the article, a literal evaluation on a sampling of the rotation group and the real-space definitions.  Install the package with the notebook extras and run it with
+Two Marimo notebooks run in the browser on [molab](https://molab.marimo.io), which installs their dependencies from the list at the top of each file:
+
+- [`notebooks/lifted_convolutions.py`](https://github.com/astro-informatics/s2conv/blob/main/notebooks/lifted_convolutions.py) demonstrates each convolution with `S2CONV` and checks it numerically against the closed forms of the article, a literal evaluation on a sampling of the rotation group and the real-space definitions.  [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/astro-informatics/s2conv/blob/main/notebooks/lifted_convolutions.py)
+- [`notebooks/real_fields.py`](https://github.com/astro-informatics/s2conv/blob/main/notebooks/real_fields.py) applies the lifted convolutions to real spin fields of the Earth and the sky.  [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/astro-informatics/s2conv/blob/main/notebooks/real_fields.py)
+
+To run them locally, install the package with the notebook extras,
 
 ```bash
 pip install ".[notebooks]"
 marimo edit notebooks/lifted_convolutions.py
 ```
+
+or let Marimo install the dependencies in an isolated environment with [uv](https://docs.astral.sh/uv/), `marimo edit --sandbox notebooks/lifted_convolutions.py`.
 
 ## Equivariance tests 📐
 

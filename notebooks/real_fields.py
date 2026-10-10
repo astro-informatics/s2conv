@@ -1,7 +1,22 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "jax",
+#     "marimo",
+#     "matplotlib",
+#     "numpy",
+#     "s2conv @ git+https://github.com/astro-informatics/s2conv",  # "s2conv" once it is released on PyPI
+#     "s2fft>=1.5.0",  # the first release whose compiled extension imports on Python 3.13
+# ]
+# ///
 # Lifted convolutions of real spin fields: a companion to the notebook lifted_convolutions.py, built on s2conv.
 # Install s2conv with the notebook extras from the repository root, pip install -e ".[notebooks]", then run
 #     marimo edit notebooks/real_fields.py   (or: marimo run notebooks/real_fields.py)
-# The fields are read from notebooks/data, which make_example_fields.py builds from the public data.
+# or let marimo install the dependencies listed above in an isolated environment, with uv:
+#     marimo edit --sandbox notebooks/real_fields.py
+# molab reads the same list: https://molab.marimo.io/github/astro-informatics/s2conv/blob/main/notebooks/real_fields.py
+# The fields are read from notebooks/data, which make_example_fields.py builds from the public data, or are downloaded
+# from GitHub when the notebook runs without the repository, as in molab.
 
 import marimo
 
