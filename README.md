@@ -21,6 +21,10 @@
 
 ## The generalised lifted convolution 🌐
 
+▶ The lifted convolution in 77 seconds: lift, convolve on SO(3), project.
+
+https://github.com/user-attachments/assets/40dccf8a-0bcb-431d-98b2-2b72cd7f7674
+
 A spin-$s$ field on the sphere is lifted to the rotation group $\mathrm{SO}(3)$ through the irreducible representation of spin $s$ of the stabiliser, convolved on $\mathrm{SO}(3)$ with a kernel $\Psi$, and projected back to the sphere through the adjoint of the lift for a possibly different spin $s'$:
 
 ```math
