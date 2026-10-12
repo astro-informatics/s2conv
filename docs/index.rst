@@ -4,8 +4,8 @@ s2conv
 **Differentiable and accelerated spherical convolutions with JAX.**
 
 s2conv implements the *generalised lifted spherical convolution* of the article
-*Unifying spherical convolutions through lifting* (J. D. McEwen, 2026, in
-preparation).
+*Unifying spherical convolutions through lifting* (J. D. McEwen, 2026,
+`arXiv:2610.13892 <https://arxiv.org/abs/2610.13892>`_).
 A spin-:math:`s` field on the sphere is *lifted* to the rotation group
 :math:`\mathrm{SO}(3)`, convolved there with a kernel :math:`\Psi`, and projected back
 to the sphere through the adjoint of the lift for a possibly different spin
@@ -95,7 +95,8 @@ The modules of the package are described in the :doc:`API documentation <api/ind
 Citation
 --------
 
-The article is forthcoming.
+Please cite the article, J. D. McEwen, *Unifying spherical convolutions through lifting*
+(2026), `arXiv:2610.13892 <https://arxiv.org/abs/2610.13892>`_.
 Please see the file ``CITATION.cff`` in the repository for how to cite s2conv.
 
 .. toctree::

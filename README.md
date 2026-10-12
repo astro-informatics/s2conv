@@ -191,14 +191,17 @@ This project follows the [all-contributors](https://github.com/all-contributors/
 
 ## Attribution 📚
 
-`S2CONV` implements the construction of the article *Unifying spherical convolutions through lifting* (J. D. McEwen, 2026, forthcoming); please cite it, and `S2FFT`, if you use this code:
+`S2CONV` implements the construction of the article *Unifying spherical convolutions through lifting* (J. D. McEwen, 2026, [arXiv:2610.13892](https://arxiv.org/abs/2610.13892)); please cite it, and `S2FFT`, if you use this code:
 
 ```
-@unpublished{mcewen2026unifying,
+@article{mcewen2026unifying,
    author      = "Jason D. McEwen",
    title       = "Unifying spherical convolutions through lifting",
+   journal     = "arXiv e-prints",
    year        = "2026",
-   note        = "Forthcoming"
+   eprint      = "2610.13892",
+   archivePrefix = "arXiv",
+   primaryClass = "math-ph"
 }
 
 @article{price:s2fft,
