@@ -11,17 +11,22 @@ authors:
 repository-code: 'https://github.com/astro-informatics/s2conv'
 license: MIT
 references:
-  - type: unpublished
+  - type: article
     authors:
       - given-names: Jason D.
         family-names: McEwen
         orcid: 'https://orcid.org/0000-0002-5852-8890'
     title: Unifying spherical convolutions through lifting
     year: 2026
-    status: in-press
+    status: preprint
+    repository: arXiv
+    identifiers:
+      - type: other
+        value: 'arXiv:2610.13892'
+    url: 'https://arxiv.org/abs/2610.13892'
     notes: >-
-      Forthcoming article describing the generalised lifted spherical
-      convolution implemented in s2conv.
+      The article describing the generalised lifted spherical convolution
+      implemented in s2conv.
   - type: article
     authors:
       - given-names: Matthew A.
